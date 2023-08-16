@@ -104,9 +104,11 @@ target = target.astype(int)
 ks = list(df_data.keys())
 ks = ks[:-1]
 feature = df_data[ks]
+# end block with reading real data
 
 
 dims = len(feature.keys())
+
 b_model = baseline(dims)
 criterion = nn.BCELoss()
 optimizer = torch.optim.Adam(b_model.parameters(), lr=1e-4, eps=1e-4)

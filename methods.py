@@ -55,14 +55,45 @@ def find_ED(f_data, eps):
     for i in range(N):
         for j in range(i, N):
             val = distance(i, j, f_data)
-            if val > eps:
-                continue
             graph[i][j] = val
             graph[j][i] = val
 
+    print(graph.max())
+
     graph_new = graph/graph.max()
+    # graph_new = np.putmask(graph_new, graph_new>eps, 0)
     
     return graph_new
+
+@njit
+def count_neighbors(graph):
+    all_number = graph.shape[1]
+    result = []
+    max_num = 0
+    id_max = None
+    for i in range(graph.shape[0]):
+        number = np.sum(graph[i]==0)
+        number = all_number - number
+        if number > max_num:
+            id_max = i
+            max_num = number
+        # print(number, id_max)
+        result.append(number)
+    
+    return result, id_max
+
+@njit
+def point_with_neighbors(data, id_point, graph):
+    neighbors = graph[id_point]
+    new_data = []
+    for j, neigh in enumerate(neighbors):
+        if neigh > 0 or j == id_point:
+            new_data.append(data[j])
+
+    return new_data
+
+
+
 
 
 def split_data_TT(feature, target):
