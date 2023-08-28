@@ -14,6 +14,8 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from sklearn.metrics import roc_curve
 from sklearn.decomposition import PCA
 
+from base.structure import Graph
+
 def baseline(dim):
     baseline_model = nn.Sequential(
         nn.Linear(dim, 256, dtype=torch.float64),
@@ -34,18 +36,25 @@ if __name__ == "__main__":
     # рисование сферы
 
     R = 5
-    n = 1000
+    n = 200
 
-    rs = R*np.sqrt(np.random.random(size=n))
-    thetas = theta = np.random.random(size=n) * 2 * np.pi
+    # rs = R*np.sqrt(np.random.random(size=n))
+    # thetas = theta = np.random.random(size=n) * 2 * np.pi
 
-    x = rs * np.cos(thetas)
-    y = rs * np.sin(thetas)
-    z = np.sqrt(R**2 - x**2 - y**2)
+    # x = rs * np.cos(thetas)
+    # y = rs * np.sin(thetas)
+    # z = np.sqrt(R**2 - x**2 - y**2)
 
-    x = np.concatenate((x, x))
-    y = np.concatenate((y, y))
-    z = np.concatenate((z, -z))
+    # x = np.concatenate((x, x))
+    # y = np.concatenate((y, y))
+    # z = np.concatenate((z, -z))
+
+    theta = np.random.random(size=n) * 2 * np.pi
+    phi = np.random.random(size=n) * np.pi
+
+    x = R * np.cos(theta) * np.sin(phi)
+    y = R * np.sin(theta) * np.sin(phi)
+    z = R * np.cos(phi)
 
     fir = plt.figure()
     ax = plt.axes(projection = '3d')
@@ -54,11 +63,69 @@ if __name__ == "__main__":
 
     plt.show()
 
+    data = np.array([x, y, z]).T
+    graph = Graph(data=data)
+
+    print(graph)
+
+    graph.draw()
+    print(len(graph.edges))
+
+    # graph.print_info_edges()
+
+    graph.check_visible_neigh()
+    
+    graph.draw()
+    print(len(graph.edges))
+
+    choosen_node = None
+    for node in graph.nodes:
+        if not choosen_node:
+            choosen_node = node
+        elif len(node.neighbours) > len(choosen_node.neighbours):
+            choosen_node = node
+
+    choosen_node.min_distance = 0
+
+    graph.dijkstra([choosen_node])
+
+    print("end")
+
+
+    data_for_pca = choosen_node.get_data_for_pca()
+    data_for_pca = np.array(data_for_pca)
+
+    start_count_components = data_for_pca.shape[1]
+
+    pca = PCA(n_components=start_count_components)
+    pca.fit(data_for_pca)
+    values = pca.singular_values_
+
+    diffs = values[:-1] - values[1:]
+    print(diffs)
+    mx = np.max(diffs)
+    splt_index = np.argmax(diffs)
+
+    newN = len(data_for_pca[:(splt_index+1)])
+    print(newN)
+
+    pca = PCA(n_components=newN)
+    pca.fit(data_for_pca)
+    print(pca.singular_values_)
+    result = pca.transform(data_for_pca)
+    plt.scatter(result[0, 0], result[0, 1], color="r")
+    plt.scatter(result[1:, 0], result[1:, 1])
+    plt.show()
+
+    
+
+'''
     eps = 0.3
     data = np.array([x, y, z]).T
     graph = methods.find_ED(data, eps)
 
     graph[graph>eps] = 0
+
 
     # print(graph)
 
@@ -99,15 +166,40 @@ if __name__ == "__main__":
     # PCA
 
     count_neigbors, id_max = methods.count_neighbors(graph)
-    print(count_neigbors, id_max)
+    # print(count_neigbors, id_max)
 
     data_for_pca = methods.point_with_neighbors(data=data, id_point=id_max, graph=graph)
     data_for_pca = np.array(data_for_pca)
     # print(data_for_pca)
 
+    print(data.shape)
+    print(data_for_pca.shape)
+
     pca = PCA(n_components=3)
     pca.fit(data_for_pca)
+    values = pca.singular_values_
+
+    different = 0
+
+    diffs = values[:-1] - values[1:]
+    print(diffs)
+    mx = np.max(diffs)
+    splt_index = np.argmax(diffs)
+
+    newN = len(data_for_pca[:(splt_index+1)])
+    print(newN)
+
+    pca = PCA(n_components=newN)
+    pca.fit(data_for_pca)
     print(pca.singular_values_)
+    result = pca.transform(data_for_pca)
+    plt.scatter(result[:, 0], result[:, 1])
+    plt.show()
+    # print()
+
+
+ '''       
+
 
 
 '''
