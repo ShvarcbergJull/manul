@@ -107,14 +107,56 @@ if __name__ == "__main__":
     splt_index = np.argmax(diffs)
 
     newN = len(data_for_pca[:(splt_index+1)])
+    newN = 2
     print(newN)
 
     pca = PCA(n_components=newN)
     pca.fit(data_for_pca)
     print(pca.singular_values_)
     result = pca.transform(data_for_pca)
+    choosen_node.set_new_params(result)
+
     plt.scatter(result[0, 0], result[0, 1], color="r")
     plt.scatter(result[1:, 0], result[1:, 1])
+    plt.show()
+
+    nodes = choosen_node.neighbours
+    other_nodes = graph.transform_nodes(nodes, result, choosen_node)
+    
+    other_points = np.array([x_node.new_params for x_node in other_nodes])
+
+    # nodes = choosen_node.neighbours
+    # from_node, nodes = graph.find_node_from(nodes)
+    # transform_nodes = graph.find_all_next_nodes(from_node)
+    # graph.test_transform(transform_nodes)
+
+    # list_transform_nodes = np.array([x_node.new_params for x_node in transform_nodes])
+
+    # plt.scatter(result[0, 0], result[0, 1], color="r")
+    # plt.scatter(result[1:, 0], result[1:, 1])
+    # plt.scatter(from_node.new_params[0], from_node.new_params[1], color="b")
+    # plt.scatter(list_transform_nodes[:, 0], list_transform_nodes[:, 1], color="g")
+    # plt.show()
+
+    # fir = plt.figure()
+    # ax = plt.axes(projection = '3d')
+
+    # neigh_params = np.array([x_node.params for x_node in nodes])
+    # list_transform_nodes = np.array([x_node.params for x_node in transform_nodes])
+
+    # ax.scatter(choosen_node.params[0], choosen_node.params[1], choosen_node.params[2], color="r")
+    # ax.scatter(neigh_params[:, 0], neigh_params[:, 1], neigh_params[:, 2])
+    # ax.scatter(from_node.params[0], from_node.params[1], from_node.params[2], color="b")
+    # ax.scatter(list_transform_nodes[:, 0], list_transform_nodes[:, 1], list_transform_nodes[:, 2], color="g")
+
+    # plt.show()
+
+
+    # other_points = graph.transform_other_points()
+
+    plt.scatter(result[0, 0], result[0, 1], color="r")
+    plt.scatter(result[1:, 0], result[1:, 1])
+    plt.scatter(other_points[:, 0], other_points[:, 1], color="g")
     plt.show()
 
     
