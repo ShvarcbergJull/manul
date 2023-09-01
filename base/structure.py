@@ -94,7 +94,7 @@ class Graph:
 
         self.nodes = points
         self.edges = []
-        self.find_ED(0.3)
+        self.find_ED(0.4)
 
     @staticmethod
     def _fitness_wrapper(params, *args):
@@ -212,7 +212,7 @@ class Graph:
                 rows.append(row)
             x0 = node.from_node.new_params
             cons = ({'type': 'eq',
-                'fun' : lambda x: Node.find_norma(x) - norm_of_a})
+                'fun' : lambda x: Node.find_norma(x - node.from_node.new_params) - norm_of_a})
             res = minimize(self._fitness_wrapper, x0.reshape(-1), args=(np.array(rows), np.array(all_results)), method='SLSQP', constraints=cons)
             node.new_params = res.x
             node.transform = True
@@ -231,6 +231,8 @@ class Graph:
 
             # list_transform_nodes = np.array([x_node.new_params for x_node in transform_nodes])
 
+            # print(list_transform_nodes)
+
             # plt.scatter(result[0, 0], result[0, 1], color="r")
             # plt.scatter(result[1:, 0], result[1:, 1])
             # plt.scatter(from_node.new_params[0], from_node.new_params[1], color="b")
@@ -243,6 +245,8 @@ class Graph:
             # neigh_params = np.array([x_node.params for x_node in nodes])
             # list_transform_nodes = np.array([x_node.params for x_node in transform_nodes])
 
+            # print(list_transform_nodes)
+
             # ax.scatter(choosen_node.params[0], choosen_node.params[1], choosen_node.params[2], color="r")
             # ax.scatter(neigh_params[:, 0], neigh_params[:, 1], neigh_params[:, 2])
             # ax.scatter(from_node.params[0], from_node.params[1], from_node.params[2], color="b")
@@ -251,6 +255,16 @@ class Graph:
             # plt.show()
 
         return return_nodes
+    
+    def get_other_nodes(self):
+        result = []
+        for node in self.nodes:
+            if node.transform:
+                continue
+            result.append(node.params)
+            node.transform = True
+        
+        return result
 
     def transform_other_points(self):
         new_nodes = list(filter(lambda x: x.min_distance is not None and not x.transform, self.nodes))

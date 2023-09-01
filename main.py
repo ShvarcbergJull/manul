@@ -13,6 +13,7 @@ import networkx as nx
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from sklearn.metrics import roc_curve
 from sklearn.decomposition import PCA
+from sklearn.datasets import make_swiss_roll
 
 from base.structure import Graph
 
@@ -38,23 +39,19 @@ if __name__ == "__main__":
     R = 5
     n = 200
 
-    # rs = R*np.sqrt(np.random.random(size=n))
-    # thetas = theta = np.random.random(size=n) * 2 * np.pi
-
-    # x = rs * np.cos(thetas)
-    # y = rs * np.sin(thetas)
-    # z = np.sqrt(R**2 - x**2 - y**2)
-
-    # x = np.concatenate((x, x))
-    # y = np.concatenate((y, y))
-    # z = np.concatenate((z, -z))
-
     theta = np.random.random(size=n) * 2 * np.pi
     phi = np.random.random(size=n) * np.pi
 
     x = R * np.cos(theta) * np.sin(phi)
     y = R * np.sin(theta) * np.sin(phi)
     z = R * np.cos(phi)
+
+    # data = make_swiss_roll(n_samples=n)
+
+    # x = data[0][:, 0]
+    # y = data[0][:, 1]
+    # z = data[0][:, 2]
+
 
     fir = plt.figure()
     ax = plt.axes(projection = '3d')
@@ -84,6 +81,9 @@ if __name__ == "__main__":
             choosen_node = node
         elif len(node.neighbours) > len(choosen_node.neighbours):
             choosen_node = node
+
+    # index_node = np.random.randint(0, len(graph.nodes))
+    # choosen_node = graph.nodes[index_node]
 
     choosen_node.min_distance = 0
 
@@ -122,7 +122,11 @@ if __name__ == "__main__":
 
     nodes = choosen_node.neighbours
     other_nodes = graph.transform_nodes(nodes, result, choosen_node)
+
+    # other_nodes = graph.get_other_nodes()
+    # other_nodes = pca.transform(other_nodes)
     
+    # other_points = np.array(other_nodes)
     other_points = np.array([x_node.new_params for x_node in other_nodes])
 
     # nodes = choosen_node.neighbours
