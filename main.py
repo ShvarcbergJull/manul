@@ -6,6 +6,7 @@ import pandas as pd
 from scipy.io.arff import loadarff
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import proj3d
 from numba import njit
 
 import networkx as nx
@@ -15,7 +16,7 @@ from sklearn.metrics import roc_curve
 from sklearn.decomposition import PCA
 from sklearn.datasets import make_swiss_roll
 
-from base.structure import Graph
+from base.structure import Graph, Edge
 
 def baseline(dim):
     baseline_model = nn.Sequential(
@@ -37,7 +38,9 @@ if __name__ == "__main__":
     # рисование сферы
 
     R = 5
-    n = 200
+    n = 400
+
+    dn = 1
 
     theta = np.random.random(size=n) * 2 * np.pi
     phi = np.random.random(size=n) * np.pi
@@ -45,6 +48,20 @@ if __name__ == "__main__":
     x = R * np.cos(theta) * np.sin(phi)
     y = R * np.sin(theta) * np.sin(phi)
     z = R * np.cos(phi)
+
+    new_x = []
+    new_y = []
+    new_z = []
+
+    for i in range(n):
+        if z[i] >= 0:
+            new_x.append(x[i])
+            new_y.append(y[i])
+            new_z.append(z[i])
+
+    x = np.array(new_x)
+    y = np.array(new_y)
+    z = np.array(new_z)
 
     # data = make_swiss_roll(n_samples=n)
 
@@ -58,6 +75,10 @@ if __name__ == "__main__":
 
     ax.scatter(x, y, z)
 
+    # for i in range(len(x)):
+    #     x2, y2, _ = proj3d.proj_transform(x[i], y[i], z[i], ax.get_proj())
+    #     plt.annotate(str(i), (x2, y2))
+
     plt.show()
 
     data = np.array([x, y, z]).T
@@ -65,105 +86,178 @@ if __name__ == "__main__":
 
     print(graph)
 
-    graph.draw()
+    # graph.draw()
     print(len(graph.edges))
 
     # graph.print_info_edges()
 
-    graph.check_visible_neigh()
+    # graph.check_visible_neigh()
+    
+    # graph.draw()
+    # print(len(graph.edges))
+
+    av_x = (x.max() + x.min()) / 2
+    av_y = (y.max() + y.min()) / 2
+    av_z = z.max()
+    choosen_nodes = graph.search_node()
+
+    # choose_node = None
+    # mn = None
+    # for node in graph.nodes:
+    #     num_mn = np.abs(av_x - node.params[0]) + np.abs(av_y - node.params[1]) + np.abs(av_z - node.params[2])
+    #     if choose_node is None:
+    #         mn = num_mn
+    #         choose_node = node
+    #         continue
+        
+    #     if num_mn < mn:
+    #         choose_node = node
+    #         mn = num_mn
+
+    choose_node = None
+    for node in graph.nodes:
+        if not choose_node:
+            choose_node = node
+        elif len(node.neighbours) > len(choose_node.neighbours):
+            choose_node = node
+    
+    graph.check_visible_neigh([choose_node])
     
     graph.draw()
     print(len(graph.edges))
 
-    choosen_node = None
-    for node in graph.nodes:
-        if not choosen_node:
-            choosen_node = node
-        elif len(node.neighbours) > len(choosen_node.neighbours):
-            choosen_node = node
+    # choosen_node = None
+    # for node in graph.nodes:
+    #     if not choosen_node:
+    #         choosen_node = node
+    #     elif len(node.neighbours) > len(choosen_node.neighbours):
+    #         choosen_node = node
 
     # index_node = np.random.randint(0, len(graph.nodes))
     # choosen_node = graph.nodes[index_node]
 
-    choosen_node.min_distance = 0
+    base_points = choosen_nodes[:dn]
+    base_points = [choose_node]
 
-    graph.dijkstra([choosen_node])
+    bs_points = np.array([x_node.params for x_node in base_points])
+    ng_points = np.array([x_node.params for x_node in choose_node.neighbours])
+    base_points.extend(choose_node.neighbours)
+    just_points = np.array([x_node.params for x_node in choosen_nodes[dn:]])
 
+    just_points = np.array([x_node.params for x_node in choosen_nodes if x_node not in base_points])
+
+    fir = plt.figure()
+    ax = plt.axes(projection = '3d')
+
+    ax.scatter(bs_points[:, 0], bs_points[:, 1], bs_points[:, 2], color="r")
+    ax.scatter(ng_points[:, 0], ng_points[:, 1], ng_points[:, 2], color="g")
+    ax.scatter(just_points[:, 0], just_points[:, 1], just_points[:, 2])
+
+    print(Edge.distance(bs_points[:, 0], bs_points[:, 1]), Edge.distance(bs_points[:, 0], bs_points[:, 2]), Edge.distance(bs_points[:, 1], bs_points[:, 2]))
+    print("before deikstra")
+    plt.show()
+
+    base_points = [choose_node]
+
+    for choosen_node in base_points:
+        choosen_node.min_distance = 0
+        choosen_node.from_node = None
+        graph.dijkstra([choosen_node])
+
+    graph.clear_after_dkstr()
+    graph.draw()
+
+    check_dictionary = {}
+    for i in range(n):
+        check_dictionary[str(i)] = 0
+
+    for choosen_node in base_points:
+        new_nodes = [choosen_node]
+        check_dictionary[choosen_node.name] = -3
+        while len(new_nodes) > 0:
+            fr_node = new_nodes.pop(0)
+            for x_node in graph.nodes:
+                if x_node.from_node is not None and x_node.from_node == fr_node:
+                    check_dictionary[x_node.name] += 1
+                    new_nodes.append(x_node)
+    print(check_dictionary)
     print("end")
 
 
-    data_for_pca = choosen_node.get_data_for_pca()
-    data_for_pca = np.array(data_for_pca)
+    keys = ["r", "b", "g"]
+    picture = {}
 
-    start_count_components = data_for_pca.shape[1]
+    for index_key, choosen_node in enumerate(base_points):     
+        data_for_pca = choosen_node.get_data_for_pca()
+        data_for_pca = np.array(data_for_pca)
 
-    pca = PCA(n_components=start_count_components)
-    pca.fit(data_for_pca)
-    values = pca.singular_values_
+        start_count_components = data_for_pca.shape[1]
 
-    diffs = values[:-1] - values[1:]
-    print(diffs)
-    mx = np.max(diffs)
-    splt_index = np.argmax(diffs)
+        for i, value in enumerate(data_for_pca):
+            data_for_pca[i] = (value - graph.avg) / graph.var
 
-    newN = len(data_for_pca[:(splt_index+1)])
-    newN = 2
-    print(newN)
+        pca = PCA(n_components=start_count_components)
+        pca.fit(data_for_pca)
+        values = pca.singular_values_
 
-    pca = PCA(n_components=newN)
-    pca.fit(data_for_pca)
-    print(pca.singular_values_)
-    result = pca.transform(data_for_pca)
-    choosen_node.set_new_params(result)
+        diffs = values[:-1] - values[1:]
+        print(diffs)
+        mx = np.max(diffs)
+        splt_index = np.argmax(diffs)
 
-    plt.scatter(result[0, 0], result[0, 1], color="r")
-    plt.scatter(result[1:, 0], result[1:, 1])
+        newN = len(data_for_pca[:(splt_index+1)])
+        newN = 2
+        print(newN)
+
+        pca = PCA(n_components=newN)
+        pca.fit(data_for_pca)
+        print(pca.singular_values_)
+        result = pca.transform(data_for_pca)
+        choosen_node.set_new_params(result)
+
+        graph.find_raw_params(pca)
+
+        plt.scatter(result[0, 0], result[0, 1], color="r")
+        plt.scatter(result[1:, 0], result[1:, 1])
+        plt.show()
+
+        nodes = choosen_node.neighbours
+        other_nodes = graph.transform_nodes(nodes, result, choosen_node)
+
+        a = [x_node.params for x_node in nodes]
+        b = [x_node.params for x_node in other_nodes]
+
+        a.extend(b)
+
+        picture[keys[index_key]] = np.array(a)
+
+        # other_nodes = graph.get_other_nodes()
+        # other_nodes = pca.transform(other_nodes)
+        
+        # other_points = np.array(other_nodes)
+        other_points = np.array([x_node.new_params for x_node in other_nodes])
+
+        plt.scatter(result[0, 0], result[0, 1], color="r")
+        plt.scatter(result[1:, 0], result[1:, 1])
+        try:
+            plt.scatter(other_points[:, 0], other_points[:, 1], color="g")
+        except Exception as e:
+            print(f"FALL: {e}")
+            print(other_points)
+        plt.show()
+
+    fir = plt.figure()
+    ax = plt.axes(projection = '3d')
+
+    count = 0
+    for key in picture:
+        count += len(picture[key])
+        ax.scatter(picture[key][:, 0], picture[key][:, 1], picture[key][:, 2], color=key)
+
     plt.show()
 
-    nodes = choosen_node.neighbours
-    other_nodes = graph.transform_nodes(nodes, result, choosen_node)
+    print(count, len(graph.nodes))
 
-    # other_nodes = graph.get_other_nodes()
-    # other_nodes = pca.transform(other_nodes)
-    
-    # other_points = np.array(other_nodes)
-    other_points = np.array([x_node.new_params for x_node in other_nodes])
-
-    # nodes = choosen_node.neighbours
-    # from_node, nodes = graph.find_node_from(nodes)
-    # transform_nodes = graph.find_all_next_nodes(from_node)
-    # graph.test_transform(transform_nodes)
-
-    # list_transform_nodes = np.array([x_node.new_params for x_node in transform_nodes])
-
-    # plt.scatter(result[0, 0], result[0, 1], color="r")
-    # plt.scatter(result[1:, 0], result[1:, 1])
-    # plt.scatter(from_node.new_params[0], from_node.new_params[1], color="b")
-    # plt.scatter(list_transform_nodes[:, 0], list_transform_nodes[:, 1], color="g")
-    # plt.show()
-
-    # fir = plt.figure()
-    # ax = plt.axes(projection = '3d')
-
-    # neigh_params = np.array([x_node.params for x_node in nodes])
-    # list_transform_nodes = np.array([x_node.params for x_node in transform_nodes])
-
-    # ax.scatter(choosen_node.params[0], choosen_node.params[1], choosen_node.params[2], color="r")
-    # ax.scatter(neigh_params[:, 0], neigh_params[:, 1], neigh_params[:, 2])
-    # ax.scatter(from_node.params[0], from_node.params[1], from_node.params[2], color="b")
-    # ax.scatter(list_transform_nodes[:, 0], list_transform_nodes[:, 1], list_transform_nodes[:, 2], color="g")
-
-    # plt.show()
-
-
-    # other_points = graph.transform_other_points()
-
-    plt.scatter(result[0, 0], result[0, 1], color="r")
-    plt.scatter(result[1:, 0], result[1:, 1])
-    plt.scatter(other_points[:, 0], other_points[:, 1], color="g")
-    plt.show()
-
-    
 
 '''
     eps = 0.3

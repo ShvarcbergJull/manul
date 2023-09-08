@@ -29,9 +29,11 @@ class Node:
         self.min_distance = None
         self.visit = False
         self.transform = False
+        self.select = False
         self.lenght = Node.find_norma(params)
 
         self.new_params = []
+        self.raw_params = []
 
     @staticmethod
     @njit
@@ -92,9 +94,17 @@ class Graph:
             node = Node(str(i), exp)
             points.append(node)
 
+        self.avg = []
+        self.var = []
+
+        for i in range(len(data[0])):
+            self.avg.append(np.average(data[:, i]))
+            self.var.append(np.var(data[:, i]))
+
         self.nodes = points
         self.edges = []
-        self.find_ED(0.4)
+        self.matrix_connect = np.zeros((len(points), len(points)))
+        self.find_ED(0.6)
 
     @staticmethod
     def _fitness_wrapper(params, *args):
@@ -103,7 +113,26 @@ class Graph:
         parameter = Node.find_norma(parametr)
 
         return  parameter ** 2
+    
+    def average_distance(self, node):
+        all_dist = 0
+        for nn in node.neighbours:
+            edge = self.search_edge([node, nn])
+            if edge:
+                all_dist += edge.distance
+        return len(node.neighbours)
+        # TODO: handle 'division by zero'
+        if len(node.neighbours) == 0:
+            return 0
+        return (all_dist / len(node.neighbours)) / len(node.neighbours)
 
+    def search_node(self):
+        ch_node = None
+        for node in self.nodes:
+            node.number = self.average_distance(node)
+        
+        ch_node = sorted(self.nodes, key=lambda x_node: x_node.number, reverse=True)
+        return ch_node
 
     def get_names(self, node):
         names = node.name
@@ -112,7 +141,104 @@ class Graph:
 
         return names
     
-    def check_visible_neigh(self):
+    @staticmethod
+    @njit
+    def is_reachable(connect_matrix, n, check_i, check_j):
+        result_matrix = connect_matrix.copy()
+
+        for k in range(n):
+            for i in range(n):
+                for j in range(n):
+                    result_matrix[i][j] = result_matrix[i][j] or (result_matrix[i][k] and result_matrix[k][j])
+        
+        if result_matrix[check_i][check_j] == 1:
+            return True
+        return False
+    
+    def check_visible_neigh(self, start_nodes):
+        while len(start_nodes) > 0:
+            current_node = start_nodes.pop(0)
+            current_node.select = True
+            if len(current_node.neighbours) == 0:
+                continue
+            neighbours = []
+            for neighbour in current_node.neighbours:
+                if neighbour.select:
+                    continue
+                edge = self.search_edge([current_node, neighbour])
+                if edge is None:
+                    current_node.__delete_neighbour__(neighbour)
+                else:
+                    neighbour.dist = edge.distance
+                    neighbours.append(neighbour)
+            neighbours = sorted(neighbours, key=lambda x: x.dist, reverse=True)
+
+            for check_this in neighbours:
+                flag = False
+                for neighbour in current_node.neighbours:
+                    if check_this == neighbour:
+                        continue
+                    value = np.dot(current_node.params - neighbour.params, check_this.params - neighbour.params)
+
+                    if value < 0:
+                        flag = True
+                        break
+
+                if flag:
+                    self.delete_edge([current_node, check_this])
+                    current_node.__delete_neighbour__(check_this)
+                    check_this.__delete_neighbour__(current_node)      
+            new_neighbours = filter(lambda x: not x.select, current_node.neighbours)
+            start_nodes.extend(sorted(new_neighbours, key=lambda x: x.dist))
+
+    def check_visible_neigh3(self, start_nodes):
+        while len(start_nodes) > 0:
+            current_node = start_nodes.pop(0)
+            current_node.select = True
+            if len(current_node.neighbours) == 0:
+                continue
+            neighbours = []
+            for neighbour in current_node.neighbours:
+                if neighbour.select:
+                    continue
+                edge = self.search_edge([current_node, neighbour])
+                if edge is None:
+                    current_node.__delete_neighbour__(neighbour)
+                else:
+                    neighbour.dist = edge.distance
+                    neighbours.append(neighbour)
+            neighbours = sorted(neighbours, key=lambda x: x.dist)
+
+            while len(neighbours) > 0:
+                check_this = neighbours.pop(0)
+                for neighbour in current_node.neighbours:
+                    if check_this == neighbour:
+                        continue
+                    value = np.dot(current_node.params - check_this.params, neighbour.params - check_this.params)
+
+                    if value < 0:
+                        self.delete_edge([current_node, neighbour])
+                        current_node.__delete_neighbour__(neighbour)
+                        neighbour.__delete_neighbour__(current_node)
+                        try:
+                            neighbours.remove(neighbour)
+                            print("deletes")
+                        except Exception as e:
+                            print("There is not point")
+                        
+                        if not self.is_reachable(self.matrix_connect, len(self.nodes), int(check_this.name), int(neighbour.name)):
+                            self.add_edge([check_this, neighbour])
+                        
+            new_neighbours = filter(lambda x: not x.select, current_node.neighbours)
+            start_nodes.extend(sorted(new_neighbours, key=lambda x: x.dist))
+        
+        print("CHECK FINISHED")
+        for node in self.nodes:
+            node.select = False
+
+            
+
+    def check_visible_neighb(self):
         for node in self.nodes:
             del_list = []
             for neigh_node in node.neighbours:
@@ -123,15 +249,22 @@ class Graph:
                     if neigh_node not in node.neighbours or neigh_node2 not in node.neighbours:
                         continue
                     
-                    value = np.dot(node.params - neigh_node2.params, neigh_node.params - neigh_node2.params)
+                    value = np.dot(node.params - neigh_node.params, neigh_node2.params - neigh_node.params)
                     if value < 0:
-                        del_neigh = self.near_neigh(node, [neigh_node, neigh_node2])
-                        self.delete_edge([node, del_neigh])
-                        node.__delete_neighbour__(del_neigh)
-                        del_neigh.__delete_neighbour__(node)
-                        # self.delete_edge([node, neigh_node2])
-                        # node.__delete_neighbour__(neigh_node2)
-                        # neigh_node2.__delete_neighbour__(node)
+                        self.delete_edge([node, neigh_node2])
+                        node.__delete_neighbour__(neigh_node2)
+                        neigh_node2.__delete_neighbour__(node)
+
+    def clear_after_dkstr(self):
+        for node in self.nodes:
+            for n_node in node.neighbours:
+                if node.from_node is not None and node.from_node == n_node:
+                    continue
+                if n_node.from_node is not None and n_node.from_node == node:
+                    continue
+                self.delete_edge([node, n_node])
+                node.__delete_neighbour__(n_node)
+                n_node.__delete_neighbour__(node)
 
     def near_neigh(self, node, neighs):
         edge0 = self.search_edge([node, neighs[0]])
@@ -146,11 +279,24 @@ class Graph:
         for edge in self.edges:
             if edge.prev == nodes[0] and edge.next == nodes[1]:
                 self.edges.remove(edge)
+                self.matrix_connect[int(edge.prev.name)][int(edge.next.name)] = 0
+                self.matrix_connect[int(edge.next.name)][int(edge.prev.name)] = 0
                 return True
             if edge.prev == nodes[1] and edge.next == nodes[0]:
                 self.edges.remove(edge)
+                self.matrix_connect[int(edge.prev.name)][int(edge.next.name)] = 0
+                self.matrix_connect[int(edge.next.name)][int(edge.prev.name)] = 0
                 return True
         return False
+    
+    def add_edge(self, nodes):
+        edge = self.search_edge(nodes)
+
+        if edge is None:
+            edge = Edge(nodes[0], nodes[1])
+            self.edges.append(edge)
+            self.matrix_connect[int(nodes[0].name)][int(nodes[1].name)] = 1
+            self.matrix_connect[int(nodes[1].name)][int(nodes[0].name)] = 1
     
     def search_edge(self, nodes):
         for edge in self.edges:
@@ -164,6 +310,8 @@ class Graph:
         while len(nodes) > 0:
             node = nodes.pop(0)
             for next_node in node.neighbours:
+                # if next_node.min_distance is not None and next_node.min_distance == 0:
+                #     continue
                 their_edge = self.search_edge([node, next_node])
                 if next_node.min_distance is None or next_node.min_distance > node.min_distance + their_edge.distance:
                     next_node.min_distance = node.min_distance + their_edge.distance
@@ -183,7 +331,10 @@ class Graph:
                 max_trans = len(your_neighs)
                 result_node = nn
         
-        tr = nodes.remove(result_node)
+        try:
+            tr = nodes.remove(result_node)
+        except Exception as e:
+            print("there are transform all")
         return result_node, nodes
     
     def find_all_next_nodes(self, from_node):
@@ -199,12 +350,43 @@ class Graph:
         for node in nodes:
             all_results = []
             rows = []
-            a = node.params - node.from_node.params
+            # a = node.params - node.from_node.params
+            a = node.from_node.params - node.params
             norm_of_a = Node.find_norma(a)
             for neigh_node in node.from_node.neighbours:
                 if not neigh_node.transform:
                     continue
-                b = neigh_node.params - node.from_node.params
+                # b = neigh_node.params - node.from_node.params
+                b = node.from_node.params - neigh_node.params
+                current_cos = np.dot(a, b) / (Node.find_norma(a) * Node.find_norma(b))
+                all_results.append(current_cos)
+                # diff = neigh_node.new_params - node.from_node.new_params
+                diff = node.from_node.new_params - neigh_node.new_params
+                row = diff.T / (norm_of_a * Node.find_norma(diff))
+                rows.append(row)
+            x0 = node.from_node.new_params
+            cons = ({'type': 'eq',
+                'fun' : lambda x: Node.find_norma(x - node.from_node.new_params) - norm_of_a})
+            res = minimize(self._fitness_wrapper, x0.reshape(-1), args=(np.array(rows), np.array(all_results)), method='SLSQP', constraints=cons)
+            node.new_params = res.x
+            node.transform = True
+
+    def find_raw_params(self, pca):
+        for node in self.nodes:
+            params = (node.params - self.avg) / self.var
+            res = pca.transform([params])
+            node.raw_params = res[0]
+
+    def transform_part(self, nodes):
+        for node in nodes:
+            all_results = []
+            rows = []
+            a = node.raw_params - node.from_node.raw_params
+            norm_of_a = Node.find_norma(a)
+            for neigh_node in node.from_node.neighbours:
+                if not neigh_node.transform:
+                    continue
+                b = neigh_node.raw_params - node.from_node.raw_params
                 current_cos = np.dot(a, b) / (Node.find_norma(a) * Node.find_norma(b))
                 all_results.append(current_cos)
                 diff = neigh_node.new_params - node.from_node.new_params
@@ -217,17 +399,52 @@ class Graph:
             node.new_params = res.x
             node.transform = True
 
+
     def transform_nodes(self, nodes, result, choosen_node):
         return_nodes = []
         while len(nodes) > 0:
             from_node, nodes = self.find_node_from(nodes)
+            if from_node is None:
+                nodes = []
+                continue
             transform_nodes = self.find_all_next_nodes(from_node)
-            self.test_transform(transform_nodes)
+            # self.test_transform(transform_nodes)
+            self.transform_part(transform_nodes)
 
             nodes.extend(transform_nodes)
             return_nodes.extend(transform_nodes)
 
             # drawing
+
+            list_transform_nodes = np.array([x_node.new_params for x_node in self.nodes if x_node.transform])
+            current_transform_nodes = np.array([x_node.new_params for x_node in transform_nodes])
+
+            plt.scatter(list_transform_nodes[:, 0], list_transform_nodes[:, 1])
+            plt.scatter(result[0, 0], result[0, 1], color="r")
+            # plt.scatter(result[1:, 0], result[1:, 1])
+            plt.scatter(from_node.new_params[0], from_node.new_params[1], color="b")
+            plt.scatter(current_transform_nodes[:, 0], current_transform_nodes[:, 1], color="g")
+            plt.show()
+
+            fir = plt.figure()
+            ax = plt.axes(projection = '3d')
+
+            all_node = [from_node]
+            # list_transform_nodes = np.array([x_node.params for x_node in self.nodes if x_node.transform])
+            current_transform_nodes = np.array([x_node.params for x_node in transform_nodes])
+            all_node.extend(transform_nodes)
+            print(all_node)
+            list_transform_nodes = np.array([x_node.params for x_node in self.nodes if x_node.transform and x_node not in all_node])
+            all_node.extend(np.array([x_node for x_node in self.nodes if x_node.transform and x_node not in all_node]))
+            all_nodes = np.array([x_node.params for x_node in self.nodes if x_node not in all_node])
+
+            ax.scatter(all_nodes[:, 0], all_nodes[:, 1], all_nodes[:, 2], color="gray")
+            ax.scatter(list_transform_nodes[:, 0], list_transform_nodes[:, 1], list_transform_nodes[:, 2])
+            ax.scatter(choosen_node.params[0], choosen_node.params[1], choosen_node.params[2], color="r")
+            ax.scatter(from_node.params[0], from_node.params[1], from_node.params[2], color="b")
+            ax.scatter(current_transform_nodes[:, 0], current_transform_nodes[:, 1], current_transform_nodes[:, 2], color="g")
+            
+            plt.show()
 
             # list_transform_nodes = np.array([x_node.new_params for x_node in transform_nodes])
 
@@ -266,58 +483,6 @@ class Graph:
         
         return result
 
-    def transform_other_points(self):
-        new_nodes = list(filter(lambda x: x.min_distance is not None and not x.transform, self.nodes))
-        new_nodes = sorted(new_nodes, key=lambda x: x.min_distance)
-
-        index = 0
-        draw_nodes = []
-        while len(new_nodes):
-            if new_nodes[index].from_node is None or not new_nodes[index].from_node.transform:
-                index += 1
-                continue
-            new_node = new_nodes.pop(index)
-            index = 0
-            all_results = []
-            rows = []
-            draw_points = []
-            colors = []
-            a = new_node.params - new_node.from_node.params
-            draw_points.append(new_node.from_node.new_params)
-            colors.append('b')
-            norm_of_a = Node.find_norma(a)
-            for neigh_node in new_node.from_node.neighbours:
-                if not neigh_node.transform:
-                    continue
-                b = neigh_node.params - new_node.from_node.params
-                current_cos = np.dot(a, b) / (Node.find_norma(a) * Node.find_norma(b))
-                all_results.append(current_cos)
-                diff = neigh_node.new_params - new_node.from_node.new_params
-                row = diff.T / (norm_of_a * Node.find_norma(diff))
-                rows.append(row)
-
-                draw_points.append(neigh_node.new_params)
-                colors.append("r")
-
-            x0 = new_node.from_node.new_params
-            # minimize(self._fitness_wrapper, x0.reshape(-1), args=(individ, self, shp))
-            res = minimize(self._fitness_wrapper, x0.reshape(-1), args=(np.array(rows), np.array(all_results)))
-
-            new_node.new_params = res.x
-            new_node.transform = True
-            draw_nodes.append(new_node.new_params)
-            draw_points.append(new_node.new_params)
-            colors.append("g")
-
-            draw_points = np.array(draw_points)
-
-            # plt.scatter(draw_points[:, 0], draw_points[:, 1], color=colors)
-            # plt.show()
-        
-        return np.array(draw_nodes)
-
-
-
     # @njit
     def find_ED(self, eps):
         N = len(self.nodes)
@@ -325,6 +490,7 @@ class Graph:
         maxval = None
         # print(graph.shape)
         for i in range(N):
+            self.matrix_connect[i][i] = 1
             for j in range(i+1, N):
                 val = Edge(self.nodes[i], self.nodes[j])
                 edgesg.append(val)
@@ -340,6 +506,8 @@ class Graph:
                 edge.prev.__add_neighbour__(edge.next)
                 edge.next.__add_neighbour__(edge.prev)
                 self.edges.append(edge)
+                self.matrix_connect[int(edge.prev.name)][int(edge.next.name)] = 1
+                self.matrix_connect[int(edge.next.name)][int(edge.prev.name)] = 1
 
     def print_info_edges(self):
         for edge in self.edges:
