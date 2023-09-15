@@ -19,9 +19,10 @@ class Node:
         ???
     '''
 
-    def __init__(self, name_point:str, params:list) -> None:
+    def __init__(self, name_point:str, params:list, color:str=None) -> None:
         self.name = name_point
         self.params = params
+        self.color = color
         self.neighbours = []
         self.edges = []
         self.count_neighbors = 0
@@ -57,12 +58,14 @@ class Node:
 
     def get_data_for_pca(self):
         result = [self.params]
+        colors = [self.color]
         for neigh in self.neighbours:
             result.append(neigh.params)
+            colors.append(neigh.color)
             neigh.transform = True
         self.transform = True
         
-        return result
+        return result, colors
     
     def set_new_params(self, pca_params):
         self.new_params = pca_params[0]
@@ -84,14 +87,17 @@ class Graph:
         ....
     '''
 
-    def __init__(self, data) -> None:
+    def __init__(self, data, colors=None) -> None:
         '''
         data must have size (n, m), where n - count experiments and m - count features of point
         '''
 
         points = []
         for i, exp in enumerate(data):
-            node = Node(str(i), exp)
+            if colors is not None:
+                node = Node(str(i), exp, color=colors[i])
+            else:
+                node = Node(str(i), exp)
             points.append(node)
 
         self.avg = []
@@ -104,12 +110,12 @@ class Graph:
         self.nodes = points
         self.edges = []
         self.matrix_connect = np.zeros((len(points), len(points)))
-        self.find_ED(0.6)
+        self.find_ED(0.15)
 
     @staticmethod
     def _fitness_wrapper(params, *args):
         A, all_cos = args
-        parametr = np.dot(A, params) - all_cos
+        parametr = np.dot(A, params) - all_cos.T
         parameter = Node.find_norma(parametr)
 
         return  parameter ** 2
@@ -120,7 +126,7 @@ class Graph:
             edge = self.search_edge([node, nn])
             if edge:
                 all_dist += edge.distance
-        return len(node.neighbours)
+        # return len(node.neighbours)
         # TODO: handle 'division by zero'
         if len(node.neighbours) == 0:
             return 0
@@ -133,6 +139,16 @@ class Graph:
         
         ch_node = sorted(self.nodes, key=lambda x_node: x_node.number, reverse=True)
         return ch_node
+    
+    def search_nodes(self, n, choose_node):
+        if n == 1:
+            return [choose_node]
+        distance_to_other = self.matrix_connect[int(choose_node.name)]
+        index_node = np.argmax(distance_to_other)
+
+        new_node = self.nodes[index_node]
+        return [choose_node, new_node]
+        
 
     def get_names(self, node):
         names = node.name
@@ -191,50 +207,6 @@ class Graph:
             new_neighbours = filter(lambda x: not x.select, current_node.neighbours)
             start_nodes.extend(sorted(new_neighbours, key=lambda x: x.dist))
 
-    def check_visible_neigh3(self, start_nodes):
-        while len(start_nodes) > 0:
-            current_node = start_nodes.pop(0)
-            current_node.select = True
-            if len(current_node.neighbours) == 0:
-                continue
-            neighbours = []
-            for neighbour in current_node.neighbours:
-                if neighbour.select:
-                    continue
-                edge = self.search_edge([current_node, neighbour])
-                if edge is None:
-                    current_node.__delete_neighbour__(neighbour)
-                else:
-                    neighbour.dist = edge.distance
-                    neighbours.append(neighbour)
-            neighbours = sorted(neighbours, key=lambda x: x.dist)
-
-            while len(neighbours) > 0:
-                check_this = neighbours.pop(0)
-                for neighbour in current_node.neighbours:
-                    if check_this == neighbour:
-                        continue
-                    value = np.dot(current_node.params - check_this.params, neighbour.params - check_this.params)
-
-                    if value < 0:
-                        self.delete_edge([current_node, neighbour])
-                        current_node.__delete_neighbour__(neighbour)
-                        neighbour.__delete_neighbour__(current_node)
-                        try:
-                            neighbours.remove(neighbour)
-                            print("deletes")
-                        except Exception as e:
-                            print("There is not point")
-                        
-                        if not self.is_reachable(self.matrix_connect, len(self.nodes), int(check_this.name), int(neighbour.name)):
-                            self.add_edge([check_this, neighbour])
-                        
-            new_neighbours = filter(lambda x: not x.select, current_node.neighbours)
-            start_nodes.extend(sorted(new_neighbours, key=lambda x: x.dist))
-        
-        print("CHECK FINISHED")
-        for node in self.nodes:
-            node.select = False
 
             
 
@@ -279,13 +251,9 @@ class Graph:
         for edge in self.edges:
             if edge.prev == nodes[0] and edge.next == nodes[1]:
                 self.edges.remove(edge)
-                self.matrix_connect[int(edge.prev.name)][int(edge.next.name)] = 0
-                self.matrix_connect[int(edge.next.name)][int(edge.prev.name)] = 0
                 return True
             if edge.prev == nodes[1] and edge.next == nodes[0]:
                 self.edges.remove(edge)
-                self.matrix_connect[int(edge.prev.name)][int(edge.next.name)] = 0
-                self.matrix_connect[int(edge.next.name)][int(edge.prev.name)] = 0
                 return True
         return False
     
@@ -295,8 +263,6 @@ class Graph:
         if edge is None:
             edge = Edge(nodes[0], nodes[1])
             self.edges.append(edge)
-            self.matrix_connect[int(nodes[0].name)][int(nodes[1].name)] = 1
-            self.matrix_connect[int(nodes[1].name)][int(nodes[0].name)] = 1
     
     def search_edge(self, nodes):
         for edge in self.edges:
@@ -320,6 +286,9 @@ class Graph:
                 if not next_node.visit:
                     nodes.append(next_node)
             node.visit = True
+        
+        for node in self.nodes:
+            node.visit = False
 
     def find_node_from(self, nodes):
         max_trans = 0
@@ -359,7 +328,7 @@ class Graph:
                 # b = neigh_node.params - node.from_node.params
                 b = node.from_node.params - neigh_node.params
                 current_cos = np.dot(a, b) / (Node.find_norma(a) * Node.find_norma(b))
-                all_results.append(current_cos)
+                all_results.append(90 - current_cos)
                 # diff = neigh_node.new_params - node.from_node.new_params
                 diff = node.from_node.new_params - neigh_node.new_params
                 row = diff.T / (norm_of_a * Node.find_norma(diff))
@@ -371,7 +340,7 @@ class Graph:
             node.new_params = res.x
             node.transform = True
 
-    def find_raw_params(self, pca):
+    def find_raw_params(self, pca, center=None):
         for node in self.nodes:
             params = (node.params - self.avg) / self.var
             res = pca.transform([params])
@@ -381,12 +350,16 @@ class Graph:
         for node in nodes:
             all_results = []
             rows = []
-            a = node.raw_params - node.from_node.raw_params
-            norm_of_a = Node.find_norma(a)
+            # a = node.raw_params - node.from_node.raw_params
+            a = node.params - node.from_node.params
+            norm_of_a = Node.find_norma(node.raw_params - node.from_node.raw_params)
+            # norm_of_a = Node.find_norma(a)
+            # transform_nodes = np.array([x_node for x_node in self.nodes if x_node.transform])
             for neigh_node in node.from_node.neighbours:
                 if not neigh_node.transform:
                     continue
-                b = neigh_node.raw_params - node.from_node.raw_params
+                # b = neigh_node.raw_params - node.from_node.raw_params
+                b = neigh_node.params - node.from_node.params
                 current_cos = np.dot(a, b) / (Node.find_norma(a) * Node.find_norma(b))
                 all_results.append(current_cos)
                 diff = neigh_node.new_params - node.from_node.new_params
@@ -394,9 +367,9 @@ class Graph:
                 rows.append(row)
             x0 = node.from_node.new_params
             cons = ({'type': 'eq',
-                'fun' : lambda x: Node.find_norma(x - node.from_node.new_params) - norm_of_a})
+                'fun' : lambda x: Node.find_norma(x) - norm_of_a})
             res = minimize(self._fitness_wrapper, x0.reshape(-1), args=(np.array(rows), np.array(all_results)), method='SLSQP', constraints=cons)
-            node.new_params = res.x
+            node.new_params = res.x + node.from_node.new_params
             node.transform = True
 
 
@@ -408,6 +381,8 @@ class Graph:
                 nodes = []
                 continue
             transform_nodes = self.find_all_next_nodes(from_node)
+            if len(transform_nodes) == 0:
+                continue
             # self.test_transform(transform_nodes)
             self.transform_part(transform_nodes)
 
@@ -416,59 +391,32 @@ class Graph:
 
             # drawing
 
-            list_transform_nodes = np.array([x_node.new_params for x_node in self.nodes if x_node.transform])
-            current_transform_nodes = np.array([x_node.new_params for x_node in transform_nodes])
+            # list_transform_nodes = np.array([x_node.new_params for x_node in self.nodes if x_node.transform])
+            # current_transform_nodes = np.array([x_node.new_params for x_node in transform_nodes])
 
-            plt.scatter(list_transform_nodes[:, 0], list_transform_nodes[:, 1])
-            plt.scatter(result[0, 0], result[0, 1], color="r")
-            # plt.scatter(result[1:, 0], result[1:, 1])
-            plt.scatter(from_node.new_params[0], from_node.new_params[1], color="b")
-            plt.scatter(current_transform_nodes[:, 0], current_transform_nodes[:, 1], color="g")
-            plt.show()
-
-            fir = plt.figure()
-            ax = plt.axes(projection = '3d')
-
-            all_node = [from_node]
-            # list_transform_nodes = np.array([x_node.params for x_node in self.nodes if x_node.transform])
-            current_transform_nodes = np.array([x_node.params for x_node in transform_nodes])
-            all_node.extend(transform_nodes)
-            print(all_node)
-            list_transform_nodes = np.array([x_node.params for x_node in self.nodes if x_node.transform and x_node not in all_node])
-            all_node.extend(np.array([x_node for x_node in self.nodes if x_node.transform and x_node not in all_node]))
-            all_nodes = np.array([x_node.params for x_node in self.nodes if x_node not in all_node])
-
-            ax.scatter(all_nodes[:, 0], all_nodes[:, 1], all_nodes[:, 2], color="gray")
-            ax.scatter(list_transform_nodes[:, 0], list_transform_nodes[:, 1], list_transform_nodes[:, 2])
-            ax.scatter(choosen_node.params[0], choosen_node.params[1], choosen_node.params[2], color="r")
-            ax.scatter(from_node.params[0], from_node.params[1], from_node.params[2], color="b")
-            ax.scatter(current_transform_nodes[:, 0], current_transform_nodes[:, 1], current_transform_nodes[:, 2], color="g")
-            
-            plt.show()
-
-            # list_transform_nodes = np.array([x_node.new_params for x_node in transform_nodes])
-
-            # print(list_transform_nodes)
-
+            # plt.scatter(list_transform_nodes[:, 0], list_transform_nodes[:, 1])
             # plt.scatter(result[0, 0], result[0, 1], color="r")
-            # plt.scatter(result[1:, 0], result[1:, 1])
             # plt.scatter(from_node.new_params[0], from_node.new_params[1], color="b")
-            # plt.scatter(list_transform_nodes[:, 0], list_transform_nodes[:, 1], color="g")
+            # plt.scatter(current_transform_nodes[:, 0], current_transform_nodes[:, 1], color="g")
             # plt.show()
 
             # fir = plt.figure()
             # ax = plt.axes(projection = '3d')
 
-            # neigh_params = np.array([x_node.params for x_node in nodes])
-            # list_transform_nodes = np.array([x_node.params for x_node in transform_nodes])
+            # all_node = [from_node]
+            # current_transform_nodes = np.array([x_node.params for x_node in transform_nodes])
+            # all_node.extend(transform_nodes)
+            # print(all_node)
+            # list_transform_nodes = np.array([x_node.params for x_node in self.nodes if x_node.transform and x_node not in all_node])
+            # all_node.extend(np.array([x_node for x_node in self.nodes if x_node.transform and x_node not in all_node]))
+            # all_nodes = np.array([x_node.params for x_node in self.nodes if x_node not in all_node])
 
-            # print(list_transform_nodes)
-
+            # ax.scatter(all_nodes[:, 0], all_nodes[:, 1], all_nodes[:, 2], color="gray")
+            # ax.scatter(list_transform_nodes[:, 0], list_transform_nodes[:, 1], list_transform_nodes[:, 2])
             # ax.scatter(choosen_node.params[0], choosen_node.params[1], choosen_node.params[2], color="r")
-            # ax.scatter(neigh_params[:, 0], neigh_params[:, 1], neigh_params[:, 2])
             # ax.scatter(from_node.params[0], from_node.params[1], from_node.params[2], color="b")
-            # ax.scatter(list_transform_nodes[:, 0], list_transform_nodes[:, 1], list_transform_nodes[:, 2], color="g")
-
+            # ax.scatter(current_transform_nodes[:, 0], current_transform_nodes[:, 1], current_transform_nodes[:, 2], color="g")
+            
             # plt.show()
 
         return return_nodes
@@ -490,7 +438,6 @@ class Graph:
         maxval = None
         # print(graph.shape)
         for i in range(N):
-            self.matrix_connect[i][i] = 1
             for j in range(i+1, N):
                 val = Edge(self.nodes[i], self.nodes[j])
                 edgesg.append(val)
@@ -502,12 +449,12 @@ class Graph:
         self.max_edge = maxval
 
         for i, edge in enumerate(edgesg):
+            self.matrix_connect[int(edge.prev.name)][int(edge.next.name)] = edge.distance/maxval
+            self.matrix_connect[int(edge.next.name)][int(edge.prev.name)] = edge.distance/maxval
             if edge.distance/maxval <= eps:
                 edge.prev.__add_neighbour__(edge.next)
                 edge.next.__add_neighbour__(edge.prev)
                 self.edges.append(edge)
-                self.matrix_connect[int(edge.prev.name)][int(edge.next.name)] = 1
-                self.matrix_connect[int(edge.next.name)][int(edge.prev.name)] = 1
 
     def print_info_edges(self):
         for edge in self.edges:
@@ -556,6 +503,54 @@ class Graph:
             ax.set_xlabel("x")
             ax.set_ylabel("y")
             ax.set_zlabel("z")
+
+
+        _format_axes(ax)
+        fig.tight_layout()
+        plt.show()
+
+    def draw2x(self):
+        draw_graph = nx.Graph()
+        draw_graph.add_nodes_from([str(j) for j in range(len(self.nodes))])
+        edge_xyz = []
+        for edge in self.edges:
+            draw_graph.add_edge(edge.prev.name, edge.next.name, weight=edge.distance)
+            edge_xyz.append([edge.prev.params, edge.next.params])
+        
+        edge_xyz = np.array(edge_xyz)
+
+        # 3d spring layout
+        pos = nx.spring_layout(draw_graph, dim=2, seed=779)
+        # Extract node and edge positions from the layout
+        # node_xyz = np.array([pos[v] for v in sorted(draw_graph)])
+        node_xy = []
+        for node in self.nodes:
+            node_xy.append(node.params)
+        node_xy = np.array(node_xy)
+        # edge_xyz = np.array([(pos[u], pos[v]) for u, v in draw_graph.edges()])
+
+        # Create the 3D figure
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+
+        # Plot the nodes - alpha is scaled by "depth" automatically
+        ax.scatter(*node_xy.T, s=100, ec="w")
+
+        # Plot the edges
+        for vizedge in edge_xyz:
+            ax.plot(*vizedge.T, color="tab:gray")
+
+
+        def _format_axes(ax):
+            """Visualization options for the 3D axes."""
+            # Turn gridlines off
+            ax.grid(False)
+            # Suppress tick labels
+            for dim in (ax.xaxis, ax.yaxis):
+                dim.set_ticks([])
+            # Set axes labels
+            ax.set_xlabel("x")
+            ax.set_ylabel("y")
 
 
         _format_axes(ax)

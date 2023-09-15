@@ -38,44 +38,26 @@ if __name__ == "__main__":
     # рисование сферы
 
     R = 5
-    n = 500
+    n = 400
 
     dn = 1
 
-    theta = np.random.random(size=n) * 2 * np.pi
-    phi = np.random.random(size=n) * np.pi
+    samp = np.random.uniform(-1, 1, 2*n).reshape((2, n))
+    colors = []
 
-    x = R * np.cos(theta) * np.sin(phi)
-    y = R * np.sin(theta) * np.sin(phi)
-    z = R * np.cos(phi)
+    for i in range(len(samp[0])):
+        if samp[0][i] > 0:
+            if samp[1][i] > 0:
+                colors.append("yellow")
+            else:
+                colors.append("red")
+        else:
+            if samp[1][i] > 0:
+                colors.append("blue")
+            else:
+                colors.append("gray")
 
-    # new_x = []
-    # new_y = []
-    # new_z = []
-
-    # for i in range(n):
-    #     if z[i] >= 0:
-    #         new_x.append(x[i])
-    #         new_y.append(y[i])
-    #         new_z.append(z[i])
-
-    # x = np.array(new_x)
-    # y = np.array(new_y)
-    # z = np.array(new_z)
-
-    # data = make_swiss_roll(n_samples=n)
-    data = make_swiss_roll(n_samples=n, hole=True)
-
-    x = data[0][:, 0]
-    y = data[0][:, 1]
-    z = data[0][:, 2]
-
-
-    fir = plt.figure()
-    ax = plt.axes(projection = '3d')
-
-    ax.scatter(x, y, z, c=data[1])
-    colors = data[1].copy()
+    plt.scatter(samp[0], samp[1], c=colors)
 
     # for i in range(len(x)):
     #     x2, y2, _ = proj3d.proj_transform(x[i], y[i], z[i], ax.get_proj())
@@ -83,37 +65,22 @@ if __name__ == "__main__":
 
     plt.show()
 
-    data = np.array([x, y, z]).T
+    data = np.array(samp).T
     graph = Graph(data=data, colors=colors)
 
     print(graph)
 
-    # graph.draw()
+    # graph.draw2x()
     print(len(graph.edges))
 
     # graph.print_info_edges()
 
     # graph.check_visible_neigh()
     
-    # graph.draw()
+    # graph.draw2x()
     # print(len(graph.edges))
 
-    av_x = (x.max() + x.min()) / 2
-    av_y = (y.max() + y.min()) / 2
-    av_z = z.max()
-
-    # choose_node = None
-    # mn = None
-    # for node in graph.nodes:
-    #     num_mn = np.abs(av_x - node.params[0]) + np.abs(av_y - node.params[1]) + np.abs(av_z - node.params[2])
-    #     if choose_node is None:
-    #         mn = num_mn
-    #         choose_node = node
-    #         continue
-        
-    #     if num_mn < mn:
-    #         choose_node = node
-    #         mn = num_mn
+    choosen_nodes = graph.search_node()
 
     choose_node = None
     for node in graph.nodes:
@@ -124,7 +91,7 @@ if __name__ == "__main__":
     
     graph.check_visible_neigh([choose_node])
     
-    graph.draw()
+    graph.draw2x()
     print(len(graph.edges))
 
     # choosen_node = None
@@ -137,45 +104,40 @@ if __name__ == "__main__":
     # index_node = np.random.randint(0, len(graph.nodes))
     # choosen_node = graph.nodes[index_node]
 
-    choosen_nodes = graph.search_nodes(dn, choose_node)
-
-    base_points = choosen_nodes.copy()
-    # base_points = [choose_node]
+    # base_points = choosen_nodes[:dn]
+    base_points = [choose_node]
 
     bs_points = np.array([x_node.params for x_node in base_points])
     ng_points = []
     points = np.copy(base_points)
-    for choose_node in points:
-        ng_points_temp = [x_node.params for x_node in choose_node.neighbours if x_node not in points]
+    for choose_node_t in points:
+        ng_points_temp = [x_node.params for x_node in choose_node_t.neighbours if x_node not in points]
         ng_points.extend(ng_points_temp)
-        base_points.extend(choose_node.neighbours)
+        base_points.extend(choose_node_t.neighbours)
     ng_points = np.array(ng_points)
     # base_points.extend(choose_node.neighbours)
     # just_points = np.array([x_node.params for x_node in choosen_nodes[dn:]])
 
-    just_points = np.array([x_node.params for x_node in graph.nodes if x_node not in base_points])
+    just_points = np.array([x_node.params for x_node in choosen_nodes if x_node not in base_points])
 
-    fir = plt.figure()
-    ax = plt.axes(projection = '3d')
+    plt.scatter(bs_points[:, 0], bs_points[:, 1], color="r")
+    plt.scatter(ng_points[:, 0], ng_points[:, 1], color="g")
+    plt.scatter(just_points[:, 0], just_points[:, 1])
 
-    ax.scatter(bs_points[:, 0], bs_points[:, 1], bs_points[:, 2], color="r")
-    ax.scatter(ng_points[:, 0], ng_points[:, 1], ng_points[:, 2], color="g")
-    ax.scatter(just_points[:, 0], just_points[:, 1], just_points[:, 2])
-
-    print(Edge.distance(bs_points[:, 0], bs_points[:, 1]), Edge.distance(bs_points[:, 0], bs_points[:, 2]), Edge.distance(bs_points[:, 1], bs_points[:, 2]))
+    # print(Edge.distance(bs_points[:, 0], bs_points[:, 1]), Edge.distance(bs_points[:, 0], bs_points[:, 2]), Edge.distance(bs_points[:, 1], bs_points[:, 2]))
     print("before deikstra")
     plt.show()
 
-    base_points = choosen_nodes.copy()
-    # base_points = [choose_node]
+    # base_points = choosen_nodes[:dn]
+    base_points = [choose_node]
 
-    for choosen_node in base_points:
-        choosen_node.min_distance = 0
-        choosen_node.from_node = None
-        graph.dijkstra([choosen_node])
+    for choosen_node_t in base_points:
+        choosen_node_t.min_distance = 0
+        choosen_node_t.from_node = None
+        graph.dijkstra([choosen_node_t])
 
-    # graph.clear_after_dkstr()
-    # graph.draw()
+    # # graph.clear_after_dkstr()
+    # # graph.draw2x()
 
     # check_dictionary = {}
     # for i in range(n):
@@ -249,7 +211,6 @@ if __name__ == "__main__":
 
         nodes = choosen_node.neighbours
         other_nodes = graph.transform_nodes(nodes, result, choosen_node)
-        print(f"LEN other POINTS: {len(other_nodes)} + {len(result)}")
 
         a = [x_node.params for x_node in nodes]
         b = [x_node.params for x_node in other_nodes]
@@ -282,111 +243,8 @@ if __name__ == "__main__":
     count = 0
     for key in picture:
         count += len(picture[key])
-        ax.scatter(picture[key][:, 0], picture[key][:, 1], picture[key][:, 2], color=key)
+        ax.scatter(picture[key][:, 0], picture[key][:, 1], color=key)
 
     plt.show()
 
     print(count, len(graph.nodes))
-
-
-'''
-    eps = 0.3
-    data = np.array([x, y, z]).T
-    graph = methods.find_ED(data, eps)
-
-    graph[graph>eps] = 0
-
-
-    # print(graph)
-
-    # raw_data = loadarff("data/phpSSK7iA.arff")
-    # df_data = pd.DataFrame(raw_data[0])
-    # target = df_data['target']
-    # target[target==b'1'] = 1
-    # target[target==b'0'] = 0
-    # target = target.astype(int)
-
-    # ks = list(df_data.keys())
-    # ks = ks[:-1]
-    # feature = df_data[ks]
-    # # end block with reading real data
-
-    # dims = len(feature.keys()) # смотрим кол-во примеров
-
-    # train_features, train_target, test_features, test_target = methods.split_data_TT(feature=feature, target=target) # делим данные на обучение и тест
-
-    # graph = methods.find_ED(train_features.numpy(), 0.3)
-
-    # print(graph.shape)
-
-
-    # G = nx.Graph()
-    # N = len(data)
-    # print(N)
-    # for i in range(N):
-    #     for j in range(i, N):
-    #         # print(i, j)
-    #         if graph[i][j] != 0:
-    #             G.add_edge(i, j, weight=graph[i][j])
-
-    # weights = nx.get_edge_attributes(G,'weight').values()
-    # nx.draw(G)
-    # plt.show()
-
-    # PCA
-
-    count_neigbors, id_max = methods.count_neighbors(graph)
-    # print(count_neigbors, id_max)
-
-    data_for_pca = methods.point_with_neighbors(data=data, id_point=id_max, graph=graph)
-    data_for_pca = np.array(data_for_pca)
-    # print(data_for_pca)
-
-    print(data.shape)
-    print(data_for_pca.shape)
-
-    pca = PCA(n_components=3)
-    pca.fit(data_for_pca)
-    values = pca.singular_values_
-
-    different = 0
-
-    diffs = values[:-1] - values[1:]
-    print(diffs)
-    mx = np.max(diffs)
-    splt_index = np.argmax(diffs)
-
-    newN = len(data_for_pca[:(splt_index+1)])
-    print(newN)
-
-    pca = PCA(n_components=newN)
-    pca.fit(data_for_pca)
-    print(pca.singular_values_)
-    result = pca.transform(data_for_pca)
-    plt.scatter(result[:, 0], result[:, 1])
-    plt.show()
-    # print()
-
-
- '''       
-
-
-
-'''
-    # создание бейслайн модели
-    b_model = baseline(dims)
-    b_criterion = nn.BCELoss()
-    optimizer = torch.optim.Adam(b_model.parameters(), lr=1e-4, eps=1e-4)
-    b_model.train()
-
-    # создание второй модели для проверки учитывания с 
-    x_model = baseline(dims)
-    criterion = nn.BCELoss()
-    x_optimizer = torch.optim.Adam(x_model.parameters(), lr=1e-4, eps=1e-4)
-    x_model.train()
-
-    settings = {"lmd": 0, "num_epochs": 500, "batch_size": 750}
-
-    new_model = methods.fit_nn(train_features, train_target, b_model, optimizer, b_criterion, manifold=False, lmd=0)
-'''
-
