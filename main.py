@@ -6,6 +6,8 @@ import pandas as pd
 from scipy.io.arff import loadarff
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import matplotlib.colors as colors_tool
 from mpl_toolkits.mplot3d import proj3d
 from numba import njit
 
@@ -38,7 +40,7 @@ if __name__ == "__main__":
     # рисование сферы
 
     R = 5
-    n = 500
+    n = 400
 
     dn = 1
 
@@ -49,6 +51,7 @@ if __name__ == "__main__":
     y = R * np.sin(theta) * np.sin(phi)
     z = R * np.cos(phi)
 
+    # полусфера
     # new_x = []
     # new_y = []
     # new_z = []
@@ -63,23 +66,38 @@ if __name__ == "__main__":
     # y = np.array(new_y)
     # z = np.array(new_z)
 
+    # свис ролл
     # data = make_swiss_roll(n_samples=n)
-    data = make_swiss_roll(n_samples=n, hole=True)
+    # data = make_swiss_roll(n_samples=n, hole=True)
 
-    x = data[0][:, 0]
-    y = data[0][:, 1]
-    z = data[0][:, 2]
+    # x = data[0][:, 0]
+    # y = data[0][:, 1]
+    # z = data[0][:, 2]
+    # colors = data[1].copy()
+
+    # циллиндр
+    theta = np.random.random(size=n) * 2 * np.pi
+    # theta = np.linspace(0, 0.2 * np.pi, n) * 2 * np.pi
+    z = np.random.random(size=n)
+    # z = np.linspace(-1, 5, n)
+    x = R * np.cos(theta)
+    y = R * np.sin(theta)
+
+    colormap = cm.viridis
+    colors = [colors_tool.rgb2hex(colormap(i)) for i in np.linspace(0, 0.9, n)]
+    
+    sorted_data = np.array([x, y, z])
+    sorted_data = np.array(sorted(sorted_data.T, key=lambda parameters: [parameters[1], parameters[0], parameters[2]]))
+
+    x = sorted_data[:, 0]
+    y = sorted_data[:, 1]
+    z = sorted_data[:, 2]
 
 
     fir = plt.figure()
     ax = plt.axes(projection = '3d')
 
-    ax.scatter(x, y, z, c=data[1])
-    colors = data[1].copy()
-
-    # for i in range(len(x)):
-    #     x2, y2, _ = proj3d.proj_transform(x[i], y[i], z[i], ax.get_proj())
-    #     plt.annotate(str(i), (x2, y2))
+    ax.scatter(x, y, z, c=colors)
 
     plt.show()
 
@@ -88,7 +106,7 @@ if __name__ == "__main__":
 
     print(graph)
 
-    # graph.draw()
+    graph.draw()
     print(len(graph.edges))
 
     # graph.print_info_edges()
