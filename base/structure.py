@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 
 import networkx as nx
+import plotly.graph_objects as go
 
 class Node:
     '''
@@ -108,9 +109,12 @@ class Graph:
             self.var.append(np.var(data[:, i]))
 
         self.nodes = points
+        temp_edges = [None for j in range(len(points))]
         self.edges = []
         self.matrix_connect = np.zeros((len(points), len(points)))
-        self.find_ED(0.15)
+        self.edges2 = [temp_edges for i in range(len(points))]
+        self.find_ED(0.3)
+        self.drawing = Draw(self)
 
     @staticmethod
     def _fitness_wrapper(params, *args):
@@ -119,58 +123,15 @@ class Graph:
         parameter = Node.find_norma(parametr)
 
         return  parameter ** 2
-    
-    def average_distance(self, node):
-        all_dist = 0
-        for nn in node.neighbours:
-            edge = self.search_edge([node, nn])
-            if edge:
-                all_dist += edge.distance
-        # return len(node.neighbours)
-        # TODO: handle 'division by zero'
-        if len(node.neighbours) == 0:
-            return 0
-        return (all_dist / len(node.neighbours)) / len(node.neighbours)
-
-    def search_node(self):
-        ch_node = None
-        for node in self.nodes:
-            node.number = self.average_distance(node)
-        
-        ch_node = sorted(self.nodes, key=lambda x_node: x_node.number, reverse=True)
-        return ch_node
-    
-    def search_nodes(self, n, choose_node):
-        if n == 1:
-            return [choose_node]
-        distance_to_other = self.matrix_connect[int(choose_node.name)]
-        index_node = np.argmax(distance_to_other)
-
-        new_node = self.nodes[index_node]
-        return [choose_node, new_node]
         
 
     def get_names(self, node):
-        names = node.name
+        names = [node.name]
         for n_node in self.nodes:
             names.append(n_node.name)
 
         return names
-    
-    @staticmethod
-    @njit
-    def is_reachable(connect_matrix, n, check_i, check_j):
-        result_matrix = connect_matrix.copy()
 
-        for k in range(n):
-            for i in range(n):
-                for j in range(n):
-                    result_matrix[i][j] = result_matrix[i][j] or (result_matrix[i][k] and result_matrix[k][j])
-        
-        if result_matrix[check_i][check_j] == 1:
-            return True
-        return False
-    
     def check_visible_neigh(self, start_nodes):
         while len(start_nodes) > 0:
             current_node = start_nodes.pop(0)
@@ -208,53 +169,19 @@ class Graph:
             start_nodes.extend(sorted(new_neighbours, key=lambda x: x.dist))
 
 
-            
-
-    def check_visible_neighb(self):
-        for node in self.nodes:
-            del_list = []
-            for neigh_node in node.neighbours:
-                for neigh_node2 in node.neighbours:
-                    if neigh_node == neigh_node2:
-                        continue
-
-                    if neigh_node not in node.neighbours or neigh_node2 not in node.neighbours:
-                        continue
-                    
-                    value = np.dot(node.params - neigh_node.params, neigh_node2.params - neigh_node.params)
-                    if value < 0:
-                        self.delete_edge([node, neigh_node2])
-                        node.__delete_neighbour__(neigh_node2)
-                        neigh_node2.__delete_neighbour__(node)
-
-    def clear_after_dkstr(self):
-        for node in self.nodes:
-            for n_node in node.neighbours:
-                if node.from_node is not None and node.from_node == n_node:
-                    continue
-                if n_node.from_node is not None and n_node.from_node == node:
-                    continue
-                self.delete_edge([node, n_node])
-                node.__delete_neighbour__(n_node)
-                n_node.__delete_neighbour__(node)
-
-    def near_neigh(self, node, neighs):
-        edge0 = self.search_edge([node, neighs[0]])
-        edge1 = self.search_edge([node, neighs[1]])
-
-        if edge0.distance < edge1.distance:
-            return neighs[1]
-        else:
-            return neighs[0]
-
     def delete_edge(self, nodes):
-        for edge in self.edges:
-            if edge.prev == nodes[0] and edge.next == nodes[1]:
-                self.edges.remove(edge)
-                return True
-            if edge.prev == nodes[1] and edge.next == nodes[0]:
-                self.edges.remove(edge)
-                return True
+        edge = self.search_edge(nodes)
+        if edge:
+            self.edges.remove(edge)
+            self.edges2[int(nodes[0].name)][int(nodes[1].name)] = None
+            return True
+        # for edge in self.edges:
+        #     if edge.prev == nodes[0] and edge.next == nodes[1]:
+        #         self.edges.remove(edge)
+        #         return True
+        #     if edge.prev == nodes[1] and edge.next == nodes[0]:
+        #         self.edges.remove(edge)
+        #         return True
         return False
     
     def add_edge(self, nodes):
@@ -263,14 +190,17 @@ class Graph:
         if edge is None:
             edge = Edge(nodes[0], nodes[1])
             self.edges.append(edge)
+            self.edges2[int(nodes[0].name)][int(nodes[1].name)] = edge
+            self.edges2[int(nodes[1].name)][int(nodes[0].name)] = edge
     
     def search_edge(self, nodes):
-        for edge in self.edges:
-            if edge.prev == nodes[0] and edge.next == nodes[1]:
-                return edge
-            if edge.prev == nodes[1] and edge.next == nodes[0]:
-                return edge
-        return 0
+        return self.edges2[int(nodes[0].name)][int(nodes[1].name)]
+        # for edge in self.edges:
+        #     if edge.prev == nodes[0] and edge.next == nodes[1]:
+        #         return edge
+        #     if edge.prev == nodes[1] and edge.next == nodes[0]:
+        #         return edge
+        # return 0
 
     def dijkstra(self, nodes):
         while len(nodes) > 0:
@@ -314,31 +244,6 @@ class Graph:
         
         result_nodes = sorted(result_nodes, key=lambda x_node: x_node.min_distance)
         return result_nodes
-    
-    def test_transform(self, nodes):
-        for node in nodes:
-            all_results = []
-            rows = []
-            # a = node.params - node.from_node.params
-            a = node.from_node.params - node.params
-            norm_of_a = Node.find_norma(a)
-            for neigh_node in node.from_node.neighbours:
-                if not neigh_node.transform:
-                    continue
-                # b = neigh_node.params - node.from_node.params
-                b = node.from_node.params - neigh_node.params
-                current_cos = np.dot(a, b) / (Node.find_norma(a) * Node.find_norma(b))
-                all_results.append(90 - current_cos)
-                # diff = neigh_node.new_params - node.from_node.new_params
-                diff = node.from_node.new_params - neigh_node.new_params
-                row = diff.T / (norm_of_a * Node.find_norma(diff))
-                rows.append(row)
-            x0 = node.from_node.new_params
-            cons = ({'type': 'eq',
-                'fun' : lambda x: Node.find_norma(x - node.from_node.new_params) - norm_of_a})
-            res = minimize(self._fitness_wrapper, x0.reshape(-1), args=(np.array(rows), np.array(all_results)), method='SLSQP', constraints=cons)
-            node.new_params = res.x
-            node.transform = True
 
     def find_raw_params(self, pca, center=None):
         for node in self.nodes:
@@ -420,16 +325,6 @@ class Graph:
             # plt.show()
 
         return return_nodes
-    
-    def get_other_nodes(self):
-        result = []
-        for node in self.nodes:
-            if node.transform:
-                continue
-            result.append(node.params)
-            node.transform = True
-        
-        return result
 
     # @njit
     def find_ED(self, eps):
@@ -455,10 +350,8 @@ class Graph:
                 edge.prev.__add_neighbour__(edge.next)
                 edge.next.__add_neighbour__(edge.prev)
                 self.edges.append(edge)
-
-    def print_info_edges(self):
-        for edge in self.edges:
-            print(edge.prev.name, edge.next.name)
+                self.edges2[int(edge.prev.name)][int(edge.next.name)] = edge
+                self.edges2[int(edge.next.name)][int(edge.prev.name)] = edge
 
     def draw(self):
         draw_graph = nx.Graph()
@@ -585,7 +478,99 @@ class Edge:
         return np.sqrt(sm)
 
 
+class Draw:
 
+    def __init__(self, graph) -> None:
+        self.graph = graph
+
+    def draw_lowd(self, nodes):
+        edges=[]
+        for edge in self.graph.edges:
+            edges.append(edge.prev.new_params)
+            edges.append(edge.next.new_params)
+            edges.append([None for i in range(len(edge.prev.new_params))])
+        
+        edges = np.array(edges).T
+        edge_trace = go.Scatter(x=edges[0], y=edges[1], line=dict(width=4, color='#888'), hoverinfo='none', mode='lines')
+        
+        nodes = np.array([node.new_params for node in self.graph.nodes]).T
+        colors = np.array([node.color for node in self.graph.nodes])
+        node_trace = go.Scatter(x=nodes[0], y=nodes[1], mode='markers', hoverinfo='text',
+                                  marker=dict(
+                                      showscale=True,
+                                      # colorscale options
+                                      # #'Greys' | 'YlGnBu' | 'Greens' | 'YlOrRd' | 'Bluered' | 'RdBu' |
+                                      # #'Reds' | 'Blues' | 'Picnic' | 'Rainbow' | 'Portland' | 'Jet' |
+                                      # #'Hot' | 'Blackbody' | 'Earth' | 'Electric' | 'Viridis' |
+                                      colorscale='YlGnBu',
+                                      reversescale=True,
+                                      color=colors,
+                                      size=10,
+                                  colorbar=dict(
+                                    thickness=15,
+                                    title='Node Connections',
+                                    xanchor='left',
+                                    titleside='right'
+                                  ),
+                                  line_width=2))
+        
+        return edge_trace, node_trace
     
+    def draw_highd(self):
+        edges=[]
+        for edge in self.graph.edges:
+            edges.append(edge.prev.params)
+            edges.append(edge.next.params)
+            edges.append([None for i in range(len(edge.prev.params))])
+        
+        edges = np.array(edges).T
+        edge_trace = go.Scatter3d(x=edges[0], y=edges[1], z=edges[2], line=dict(width=4, color='#888'), hoverinfo='none', mode='lines')
+        
+        nodes = np.array([node.params for node in self.graph.nodes]).T
+        colors = np.array([node.color for node in self.graph.nodes])
+        node_trace = go.Scatter3d(x=nodes[0], y=nodes[1], z=nodes[2], mode='markers', hoverinfo='text',
+                                  marker=dict(
+                                      showscale=True,
+                                      # colorscale options
+                                      # #'Greys' | 'YlGnBu' | 'Greens' | 'YlOrRd' | 'Bluered' | 'RdBu' |
+                                      # #'Reds' | 'Blues' | 'Picnic' | 'Rainbow' | 'Portland' | 'Jet' |
+                                      # #'Hot' | 'Blackbody' | 'Earth' | 'Electric' | 'Viridis' |
+                                      colorscale='YlGnBu',
+                                      reversescale=True,
+                                      color=colors,
+                                      size=10,
+                                  colorbar=dict(
+                                    thickness=15,
+                                    title='Node Connections',
+                                    xanchor='left',
+                                    titleside='right'
+                                  ),
+                                  line_width=2))
+        
+        return edge_trace, node_trace
+
+    def draw_graph(self, mode=0, data=None):
+
+        if mode:
+            edge_trace, node_trace = self.draw_lowd(data)
+        else:
+            edge_trace, node_trace = self.draw_highd()       
+        
+        fig = go.Figure(data=[edge_trace, node_trace],
+             layout=go.Layout(
+                title='<br>Network graph made with Python',
+                titlefont_size=16,
+                showlegend=False,
+                hovermode='closest',
+                margin=dict(b=20,l=5,r=5,t=40),
+                annotations=[ dict(
+                    text="Python code: <a href='https://plotly.com/ipython-notebooks/network-graphs/'> https://plotly.com/ipython-notebooks/network-graphs/</a>",
+                    showarrow=False,
+                    xref="paper", yref="paper",
+                    x=0.005, y=-0.002 ) ],
+                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
+                )
+        fig.show()
 
         

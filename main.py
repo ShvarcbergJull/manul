@@ -42,7 +42,7 @@ if __name__ == "__main__":
     R = 5
     n = 400
 
-    dn = 1
+    dn = 2
 
     theta = np.random.random(size=n) * 2 * np.pi
     phi = np.random.random(size=n) * np.pi
@@ -50,6 +50,16 @@ if __name__ == "__main__":
     x = R * np.cos(theta) * np.sin(phi)
     y = R * np.sin(theta) * np.sin(phi)
     z = R * np.cos(phi)
+
+    colormap = cm.viridis
+    colors = [colors_tool.rgb2hex(colormap(i)) for i in np.linspace(0, 0.9, n)]
+
+    sorted_data = np.array([x, y, z])
+    sorted_data = np.array(sorted(sorted_data.T, key=lambda parameters: parameters[2]))
+
+    x = sorted_data[:, 0]
+    y = sorted_data[:, 1]
+    z = sorted_data[:, 2]
 
     # полусфера
     # new_x = []
@@ -76,23 +86,66 @@ if __name__ == "__main__":
     # colors = data[1].copy()
 
     # циллиндр
-    theta = np.random.random(size=n) * 2 * np.pi
-    # theta = np.linspace(0, 0.2 * np.pi, n) * 2 * np.pi
-    z = np.random.random(size=n)
-    # z = np.linspace(-1, 5, n)
-    x = R * np.cos(theta)
-    y = R * np.sin(theta)
+    # theta = np.random.random(size=n) * 2 * np.pi
+    # # theta = np.linspace(0, 0.2 * np.pi, n) * 2 * np.pi
+    # z = np.random.random(size=n)
+    # # z = np.linspace(-1, 5, n)
+    # x = R * np.cos(theta)
+    # y = R * np.sin(theta)
 
-    colormap = cm.viridis
-    colors = [colors_tool.rgb2hex(colormap(i)) for i in np.linspace(0, 0.9, n)]
+    # min_x = np.min(x)
+    # min_y = np.min(y)
+
+    # colormap = cm.viridis
+    # colors = [colors_tool.rgb2hex(colormap(i)) for i in np.linspace(0, 0.9, n)]
     
-    sorted_data = np.array([x, y, z])
-    sorted_data = np.array(sorted(sorted_data.T, key=lambda parameters: [parameters[1], parameters[0], parameters[2]]))
+    # sorted_data = np.array([x, y, z])
+    # # sorted_data = np.array(sorted(sorted_data.T, key=lambda parameters: parameters[1]/np.sqrt(parameters[0] ** 2 + parameters[1] ** 2)))
+    # sorted_data = np.array(sorted(sorted_data.T, key=lambda parameters: [parameters[0], parameters[1], parameters[2]]))
 
-    x = sorted_data[:, 0]
-    y = sorted_data[:, 1]
-    z = sorted_data[:, 2]
+    # x = sorted_data[:, 0]
+    # y = sorted_data[:, 1]
+    # z = sorted_data[:, 2]
 
+    # hepta
+
+    # raw_data = loadarff("data/atom.arff")
+    # df_data = pd.DataFrame(raw_data[0])
+
+    # each_color = np.unique(df_data["class"])
+    # colormap = cm.viridis
+    # all_colors = [colors_tool.rgb2hex(colormap(i)) for i in np.linspace(0, 0.9, len(each_color))]
+
+    # colors = df_data["class"].to_numpy()
+    # for i, elem in enumerate(each_color):
+    #     colors[colors==elem] = all_colors[i]
+
+    # x = df_data["x"]
+    # y = df_data["y"]
+    # z = df_data["z"]
+
+
+    # gauss
+
+    # x = np.random.uniform(-1, 1, size=n)
+    # y = np.random.uniform(-1, 1, size=n)
+    # theta = np.pi / 2
+
+    # # z = -np.sqrt(x ** 2 + y ** 2) * (1 / np.tan(theta))
+    # z = np.exp(-x ** 2 - y ** 2)
+
+    # # for i in range(200):
+    # #     z[i] = -z[i]
+
+    # colormap = cm.viridis
+    # colors = [colors_tool.rgb2hex(colormap(i)) for i in np.linspace(0, 0.9, n)]
+
+    # sorted_data = np.array([x, y, z])
+    # sorted_data = np.array(sorted(sorted_data.T, key=lambda parameters: parameters[2]))
+
+    # x = sorted_data[:, 0]
+    # y = sorted_data[:, 1]
+    # z = sorted_data[:, 2]
 
     fir = plt.figure()
     ax = plt.axes(projection = '3d')
@@ -144,6 +197,7 @@ if __name__ == "__main__":
     
     graph.draw()
     print(len(graph.edges))
+    graph.drawing.draw_graph()
 
     # choosen_node = None
     # for node in graph.nodes:
@@ -293,6 +347,11 @@ if __name__ == "__main__":
             print(f"FALL: {e}")
             print(other_points)
         plt.show()
+
+        # info_for_draw = [choose_node]
+        # info_for_draw.extend(choose_node.neighbours)
+        # info_for_draw.extend(other_nodes)
+        # graph.drawing.draw_graph(mode=1, data=info_for_draw)
 
     fir = plt.figure()
     ax = plt.axes(projection = '3d')
