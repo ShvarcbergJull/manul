@@ -194,13 +194,13 @@ class Graph:
             self.edges2[int(nodes[1].name)][int(nodes[0].name)] = edge
     
     def search_edge(self, nodes):
-        return self.edges2[int(nodes[0].name)][int(nodes[1].name)]
-        # for edge in self.edges:
-        #     if edge.prev == nodes[0] and edge.next == nodes[1]:
-        #         return edge
-        #     if edge.prev == nodes[1] and edge.next == nodes[0]:
-        #         return edge
-        # return 0
+        # return self.edges2[int(nodes[0].name)][int(nodes[1].name)]
+        for edge in self.edges:
+            if edge.prev == nodes[0] and edge.next == nodes[1]:
+                return edge
+            if edge.prev == nodes[1] and edge.next == nodes[0]:
+                return edge
+        return None
 
     def dijkstra(self, nodes):
         while len(nodes) > 0:

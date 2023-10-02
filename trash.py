@@ -17,7 +17,9 @@ dn = 1
 
 raw_data = loadarff("data/phpSSK7iA.arff")
 df_data = pd.DataFrame(raw_data[0])
-target = df_data['target']
+random_index = np.random.randint(0, 3750, size=1876)
+df_data = df_data.iloc[random_index]
+target = df_data['target'].to_numpy()
 target[target==b'1'] = 1
 target[target==b'0'] = 0
 target = target.astype(int)
