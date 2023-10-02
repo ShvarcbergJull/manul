@@ -1,4 +1,4 @@
-from numba import njit
+from numba import njit, typed
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
@@ -53,9 +53,11 @@ class Node:
     def __add_neighbour__(self, neigh_node) -> None:
         if neigh_node not in self.neighbours:
             self.neighbours.append(neigh_node)
+            # self.edges.append(edge)
 
     def __delete_neighbour__(self, neigh_node) -> None:
         self.neighbours.remove(neigh_node)
+        # self.edges.remove(edge)
 
     def get_data_for_pca(self):
         result = [self.params]
@@ -111,6 +113,7 @@ class Graph:
         self.nodes = points
         temp_edges = [None for j in range(len(points))]
         self.edges = []
+        self.coord_edges = []
         self.matrix_connect = np.zeros((len(points), len(points)))
         self.edges2 = [temp_edges for i in range(len(points))]
         self.find_ED(0.3)
@@ -123,6 +126,10 @@ class Graph:
         parameter = Node.find_norma(parametr)
 
         return  parameter ** 2
+    
+    def append_edge(self, edge):
+        self.edges.append(edge)
+        self.coord_edges.append((edge.prev.name, edge.next.name))
         
 
     def get_names(self, node):
@@ -131,6 +138,15 @@ class Graph:
             names.append(n_node.name)
 
         return names
+    
+    def search_nodes(self, n, choose_node):
+        if n == 1:
+            return [choose_node]
+        distance_to_other = self.matrix_connect[int(choose_node.name)]
+        index_node = np.argmax(distance_to_other)
+
+        new_node = self.nodes[index_node]
+        return [choose_node, new_node]
 
     def check_visible_neigh(self, start_nodes):
         while len(start_nodes) > 0:
@@ -164,16 +180,20 @@ class Graph:
                 if flag:
                     self.delete_edge([current_node, check_this])
                     current_node.__delete_neighbour__(check_this)
-                    check_this.__delete_neighbour__(current_node)      
+                    check_this.__delete_neighbour__(current_node)
             new_neighbours = filter(lambda x: not x.select, current_node.neighbours)
             start_nodes.extend(sorted(new_neighbours, key=lambda x: x.dist))
 
 
     def delete_edge(self, nodes):
-        edge = self.search_edge(nodes)
-        if edge:
-            self.edges.remove(edge)
+        index = Graph.helper_searcher(typed.List([nodes[0].name, nodes[1].name]), typed.List(self.coord_edges))
+        # edge = self.search_edge(nodes)
+        if index is not None:
+            # self.edges.remove(edge)
+            self.edges.pop(index)
+            self.coord_edges.pop(index)
             self.edges2[int(nodes[0].name)][int(nodes[1].name)] = None
+            self.edges2[int(nodes[1].name)][int(nodes[0].name)] = None
             return True
         # for edge in self.edges:
         #     if edge.prev == nodes[0] and edge.next == nodes[1]:
@@ -189,18 +209,33 @@ class Graph:
 
         if edge is None:
             edge = Edge(nodes[0], nodes[1])
-            self.edges.append(edge)
+            # self.edges.append(edge)
+            self.append_edge(edge)
             self.edges2[int(nodes[0].name)][int(nodes[1].name)] = edge
             self.edges2[int(nodes[1].name)][int(nodes[0].name)] = edge
     
-    def search_edge(self, nodes):
-        # return self.edges2[int(nodes[0].name)][int(nodes[1].name)]
-        for edge in self.edges:
-            if edge.prev == nodes[0] and edge.next == nodes[1]:
-                return edge
-            if edge.prev == nodes[1] and edge.next == nodes[0]:
-                return edge
+    @staticmethod
+    @njit
+    def helper_searcher(names, edges):
+        for i, edg in enumerate(edges):
+            if edg[0] == names[0] and edg[1] == names[1]:
+                return i
+            if edg[0] == names[1] and edg[1] == names[0]:
+                return i
         return None
+
+    def search_edge(self, nodes):
+        index = Graph.helper_searcher(typed.List([nodes[0].name, nodes[1].name]), typed.List(self.coord_edges))
+        if index is None:
+            return None
+        return self.edges[index]
+        # return self.edges2[int(nodes[0].name)][int(nodes[1].name)]
+        # for edge in self.edges:
+        #     if edge.prev == nodes[0] and edge.next == nodes[1]:
+        #         return edge
+        #     if edge.prev == nodes[1] and edge.next == nodes[0]:
+        #         return edge
+        # return None
 
     def dijkstra(self, nodes):
         while len(nodes) > 0:
@@ -349,7 +384,8 @@ class Graph:
             if edge.distance/maxval <= eps:
                 edge.prev.__add_neighbour__(edge.next)
                 edge.next.__add_neighbour__(edge.prev)
-                self.edges.append(edge)
+                # self.edges.append(edge)
+                self.append_edge(edge)
                 self.edges2[int(edge.prev.name)][int(edge.next.name)] = edge
                 self.edges2[int(edge.next.name)][int(edge.prev.name)] = edge
 
