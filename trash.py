@@ -11,7 +11,7 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from sklearn.metrics import roc_curve
 from sklearn.decomposition import PCA
 
-from base.structure import Graph, Edge
+from base.structure_new import Graph
 
 dn = 1
 
