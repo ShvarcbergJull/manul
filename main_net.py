@@ -12,6 +12,7 @@ from mpl_toolkits.mplot3d import proj3d
 from numba import njit
 
 import networkx as nx
+import time
 
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from sklearn.metrics import roc_curve
@@ -40,7 +41,7 @@ if __name__ == "__main__":
     # рисование сферы
 
     R = 5
-    n = 400
+    n = 1000
 
     dn = 2
 
@@ -78,7 +79,7 @@ if __name__ == "__main__":
 
     # свис ролл
     # data = make_swiss_roll(n_samples=n)
-    # data = make_swiss_roll(n_samples=n, hole=True)
+    # # data = make_swiss_roll(n_samples=n, hole=True)
 
     # x = data[0][:, 0]
     # y = data[0][:, 1]
@@ -155,12 +156,15 @@ if __name__ == "__main__":
     plt.show()
 
     data = np.array([x, y, z]).T
+    time_start = time.time()
     graph = Graph(data=data, colors=colors)
+    print("--- %s seconds ---" % (time.time() - time_start))
 
     print(graph)
 
-    graph.draw()
+    # graph.draw()
     print(len(graph.edges))
+    graph.drawing.draw_graph()
 
     # graph.print_info_edges()
 
@@ -195,7 +199,7 @@ if __name__ == "__main__":
     
     graph.check_visible_neigh([choose_node])
     
-    graph.draw()
+    # graph.draw()
     print(len(graph.edges))
     graph.drawing.draw_graph()
 
@@ -214,18 +218,18 @@ if __name__ == "__main__":
     base_points = choosen_nodes.copy()
     # base_points = [choose_node]
 
-    bs_points = np.array([x_node.params for x_node in base_points])
+    bs_points = np.array([x_node["params"] for x_node in base_points])
     ng_points = []
     points = np.copy(base_points)
     for choose_node in points:
-        ng_points_temp = [x_node.params for x_node in choose_node.neighbours if x_node not in points]
+        ng_points_temp = [graph.nodes[x_node]["params"] for x_node in graph.neighbors(choose_node["name"]) if graph.nodes[x_node] not in points]
         ng_points.extend(ng_points_temp)
-        base_points.extend(choose_node.neighbours)
+        base_points.extend([graph.nodes[indexf] for indexf in graph.neighbors(choose_node["name"])])
     ng_points = np.array(ng_points)
     # base_points.extend(choose_node.neighbours)
     # just_points = np.array([x_node.params for x_node in choosen_nodes[dn:]])
 
-    just_points = np.array([x_node.params for x_node in graph.nodes if x_node not in base_points])
+    just_points = np.array([graph.nodes[x_node]["params"] for x_node in graph.nodes if graph.nodes[x_node] not in base_points])
 
     fir = plt.figure()
     ax = plt.axes(projection = '3d')
@@ -242,8 +246,8 @@ if __name__ == "__main__":
     # base_points = [choose_node]
 
     for choosen_node in base_points:
-        choosen_node.min_distance = 0
-        choosen_node.from_node = None
+        choosen_node["min_distance"] = 0
+        choosen_node["from_node"] = None
         graph.dijkstra([choosen_node])
 
     # graph.clear_after_dkstr()
@@ -270,7 +274,7 @@ if __name__ == "__main__":
     picture = {}
 
     for index_key, choosen_node in enumerate(base_points):     
-        data_for_pca, colors_pca = choosen_node.get_data_for_pca()
+        data_for_pca, colors_pca = graph.get_data_for_pca(choosen_node)
         data_for_pca = np.array(data_for_pca)
 
         # temp_avg = []
@@ -311,20 +315,20 @@ if __name__ == "__main__":
         # for i in range(len(result)-1, -1, -1):
         #     result[i] = result[i] - result[0]
 
-        choosen_node.set_new_params(result)
+        graph.set_new_params(choosen_node, result)
 
         graph.find_raw_params(pca)
 
-        plt.scatter(result[0, 0], result[0, 1], color="r")
+        plt.scatter(result[0, 0], result[0, 1], c=["r"])
         plt.scatter(result[1:, 0], result[1:, 1])
         plt.show()
 
-        nodes = choosen_node.neighbours
+        nodes = [graph.nodes[index_node] for index_node in graph.neighbors(choosen_node["name"])]
         other_nodes = graph.transform_nodes(nodes, result, choosen_node)
         print(f"LEN other POINTS: {len(other_nodes)} + {len(result)}")
 
-        a = [x_node.params for x_node in nodes]
-        b = [x_node.params for x_node in other_nodes]
+        a = [x_node["params"] for x_node in nodes]
+        b = [x_node["params"] for x_node in other_nodes]
 
         a.extend(b)
 
@@ -334,8 +338,8 @@ if __name__ == "__main__":
         # other_nodes = pca.transform(other_nodes)
         
         # other_points = np.array(other_nodes)
-        other_points = np.array([x_node.new_params for x_node in other_nodes])
-        other_colors = np.array([x_node.color for x_node in other_nodes])
+        other_points = np.array([x_node["new_params"] for x_node in other_nodes])
+        other_colors = np.array([x_node["color"] for x_node in other_nodes])
 
         # plt.scatter(result[0, 0], result[0, 1], color="r")
         # plt.scatter(result[1:, 0], result[1:, 1])

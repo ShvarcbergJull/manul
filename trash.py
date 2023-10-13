@@ -11,7 +11,7 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from sklearn.metrics import roc_curve
 from sklearn.decomposition import PCA
 
-from base.structure_new import Graph
+from base.network import Graph
 
 dn = 1
 
@@ -34,10 +34,10 @@ print("TARGET", target)
 graph = Graph(data=feature.values, colors=target)
 
 choose_node = None
-for node in graph.nodes:
+for node in graph.nodes.values():
     if not choose_node:
         choose_node = node
-    elif len(node.neighbours) > len(choose_node.neighbours):
+    elif len(list(graph.neighbors(node["name"]))) > len(list(graph.neighbors(choose_node["name"]))):
         choose_node = node
 
 print("starting check")
@@ -47,15 +47,17 @@ choosen_nodes = graph.search_nodes(dn, choose_node)
 
 base_points = choosen_nodes.copy()
 for choosen_node in base_points:
-    choosen_node.min_distance = 0
-    choosen_node.from_node = None
+    choosen_node["min_distance"] = 0
+    choosen_node["from_node"] = None
     graph.dijkstra([choosen_node])
+
+print("end")
 
 keys = ["r", "b", "g"]
 picture = {}
 
 for index_key, choosen_node in enumerate(base_points): 
-    data_for_pca, colors_pca = choosen_node.get_data_for_pca()
+    data_for_pca, colors_pca = graph.get_data_for_pca(choosen_node)
     data_for_pca = np.array(data_for_pca)
 
     start_count_components = np.min(data_for_pca.shape)
@@ -86,20 +88,20 @@ for index_key, choosen_node in enumerate(base_points):
     # for i in range(len(result)-1, -1, -1):
     #     result[i] = result[i] - result[0]
 
-    choosen_node.set_new_params(result)
+    graph.set_new_params(choosen_node, result)
 
     graph.find_raw_params(pca)
 
-    plt.scatter(result[0, 0], result[0, 1], color="r")
+    plt.scatter(result[0, 0], result[0, 1], c=["r"])
     plt.scatter(result[1:, 0], result[1:, 1])
     plt.show()
 
-    nodes = choosen_node.neighbours
+    nodes = [graph.nodes[index_node] for index_node in graph.neighbors(choosen_node["name"])]
     other_nodes = graph.transform_nodes(nodes, result, choosen_node)
     print(f"LEN other POINTS: {len(other_nodes)} + {len(result)}")
 
-    a = [x_node.params for x_node in nodes]
-    b = [x_node.params for x_node in other_nodes]
+    a = [x_node["params"] for x_node in nodes]
+    b = [x_node["params"] for x_node in other_nodes]
 
     a.extend(b)
 
@@ -109,8 +111,8 @@ for index_key, choosen_node in enumerate(base_points):
     # other_nodes = pca.transform(other_nodes)
     
     # other_points = np.array(other_nodes)
-    other_points = np.array([x_node.new_params for x_node in other_nodes])
-    other_colors = np.array([x_node.color for x_node in other_nodes])
+    other_points = np.array([x_node["new_params"] for x_node in other_nodes])
+    other_colors = np.array([x_node["color"] for x_node in other_nodes])
 
     # plt.scatter(result[0, 0], result[0, 1], color="r")
     # plt.scatter(result[1:, 0], result[1:, 1])
