@@ -12,6 +12,7 @@ from sklearn.metrics import roc_curve
 from sklearn.decomposition import PCA
 
 from base.network import Graph
+import base.methods as mth
 
 dn = 1
 
@@ -31,7 +32,9 @@ feature = df_data[ks]
 print("FEAT", feature.values.shape)
 print("TARGET", target)
 
-graph = Graph(data=feature.values, colors=target)
+data, avg_of_data, var_of_data = mth.prebording_data(feature.values)
+
+graph = Graph(data=data, colors=target)
 
 choose_node = None
 for node in graph.nodes.values():
@@ -43,6 +46,8 @@ for node in graph.nodes.values():
 print("starting check")
 
 graph.check_visible_neigh([choose_node])
+print("next step")
+
 choosen_nodes = graph.search_nodes(dn, choose_node)
 
 base_points = choosen_nodes.copy()

@@ -5,6 +5,9 @@ from scipy.optimize import minimize
 
 import networkx as nx
 import plotly.graph_objects as go
+from line_profiler import profile
+
+# import lib
 
 @njit
 def distance(p_params, q_params):
@@ -48,9 +51,11 @@ class Graph(nx.Graph):
             if colors is not None:
                 color = colors[i]                
             self.add_nodes_from([(i, {"name": i, "params": elem, "color": color, "select": False})])
+        
+        self._source_data = data
 
         self.matrix_connect = np.zeros((self.number_of_nodes(), self.number_of_nodes()))
-        self.find_ED(0.3)
+        self.find_ED(0.45)
         self.drawing = Draw(self)
 
     @staticmethod
@@ -111,7 +116,8 @@ class Graph(nx.Graph):
         for node in self.nodes:
             self.nodes[node]["visit"] = False
     
-    def check_visible_neigh(self, start_nodes):
+    # @profile
+    def check_visible_neigh_b(self, start_nodes):
         while len(start_nodes) > 0:
             current_node = start_nodes.pop(0)
             current_node["select"] = True
@@ -121,6 +127,8 @@ class Graph(nx.Graph):
 
             for check_this_index in neighbours:
                 check_this = self.nodes[check_this_index[0]]
+                if check_this["select"]:
+                    continue
                 flag = False
                 for neighbour_index in self.neighbors(current_node["name"]):
                     neighbour = self.nodes[neighbour_index]
@@ -134,9 +142,47 @@ class Graph(nx.Graph):
 
                 if flag:
                     self.remove_edge(current_node["name"], check_this["name"])
-            new_neighbours_indexs = sorted(self[current_node["name"]].items(), key=lambda edge: edge[1]["weight"])
-            new_neighbours_indexs = filter(lambda index: not self.nodes[index[0]]["select"], new_neighbours_indexs)
-            start_nodes.extend([self.nodes[x[0]] for x in new_neighbours_indexs])
+                else:
+                    start_nodes.append(check_this)
+            # new_neighbours_indexs = sorted(self[current_node["name"]].items(), key=lambda edge: edge[1]["weight"])
+            # new_neighbours_indexs = filter(lambda index: not self.nodes[index[0]]["select"], new_neighbours_indexs)
+            # start_nodes.extend([self.nodes[x[0]] for x in new_neighbours_indexs])
+
+    def check_visible_neigh(self, start_nodes):
+        while len(start_nodes) > 0:
+            current_node = start_nodes.pop(0)
+            current_node["select"] = True
+            if len(list(self.neighbors(current_node["name"]))) == 0:
+                continue
+            neighbours_indexes = sorted(self[current_node["name"]].items(), key=lambda edge: edge[1]["weight"])
+            neighbours_indexes = np.array(list(zip(*neighbours_indexes))[0])
+            add_params = np.array([self.nodes[node]["params"] for node in neighbours_indexes])
+            neighbours = np.array(current_node["params"]) - add_params
+
+            for i, elem in enumerate(neighbours_indexes):
+                check_this = self.nodes[elem]
+                neigh_2 = np.array(check_this["params"]) - add_params
+                result = np.diag(np.dot(neighbours, neigh_2.T))
+                if len(result[result < 0]) > 0:
+                    self.remove_edge(current_node["name"], check_this["name"])
+                else:
+                    if not check_this["select"]:
+                        start_nodes.append(check_this)
+
+    @staticmethod
+    @njit
+    def fast_checking(source_data, index_neighbours, index_current_node, index_check_this):
+        current_params = source_data[index_current_node]
+        check_params = source_data[index_check_this]
+        for i_neighbour in index_neighbours:
+            if i_neighbour == index_check_this:
+                continue
+            neigh_params = source_data[i_neighbour]
+            value = np.dot(current_params - neigh_params, check_params - neigh_params)
+
+            if value < 0:
+                return True
+        return False
 
     def search_edge(self, nodes):
         try:

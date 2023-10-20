@@ -197,7 +197,9 @@ if __name__ == "__main__":
         elif len(list(graph.neighbors(node["name"]))) > len(list(graph.neighbors(choose_node["name"]))):
             choose_node = node
     
+    time_start = time.time()
     graph.check_visible_neigh([choose_node])
+    print("--- %s seconds ---" % (time.time() - time_start))
     
     # graph.draw()
     print(len(graph.edges))
