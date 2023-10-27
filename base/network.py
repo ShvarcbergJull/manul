@@ -4,7 +4,9 @@ import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 
 import networkx as nx
+import topo as tp
 import plotly.graph_objects as go
+from sklearn.decomposition import PCA
 # from line_profiler import profile
 
 # import lib
@@ -64,7 +66,12 @@ class Graph(nx.Graph):
         self._source_data = data
 
         self.matrix_connect = np.zeros((self.number_of_nodes(), self.number_of_nodes()))
-        self.find_ED(0.45)
+        self.kernel = tp.tpgraph.Kernel(n_neighbors=500, n_jobs=1, metric='cosine')
+        self.kernel.fit(data)
+
+        self.connected = self.kernel.A.todense()
+        # self.find_ED(0.4)
+        self.find_graph(0.1)
         self.drawing = Draw(self)
 
     @staticmethod
@@ -96,6 +103,16 @@ class Graph(nx.Graph):
             self.matrix_connect[edge[1]["name"]][edge[0]["name"]] = edge[2]
             if edge[2]/maxval <= eps:
                 self.add_edge(int(edge[0]["name"]), int(edge[1]["name"]), weight=edge[2])
+
+    def find_graph(self, eps):
+        max_value = np.max(self.kernel.SP)
+        N = self.number_of_nodes()
+
+        for i in range(N):
+            for j in range(i+1, N):
+                # if self.kernel.SP[i][j]  / max_value <= eps:
+                if self.connected[i, j] == 1 and self.nodes[i]["name"] != self.nodes[j]["name"]:
+                    self.add_edge(int(self.nodes[i]["name"]), int(self.nodes[j]["name"]), weight=self.kernel.SP[i][j])
 
     def search_nodes(self, n, choose_node):
         if n == 1:
@@ -157,7 +174,7 @@ class Graph(nx.Graph):
             # new_neighbours_indexs = filter(lambda index: not self.nodes[index[0]]["select"], new_neighbours_indexs)
             # start_nodes.extend([self.nodes[x[0]] for x in new_neighbours_indexs])
 
-    def check_visible_neigh(self, start_nodes):
+    def check_visible_neigh_gh(self, start_nodes):
         while len(start_nodes) > 0:
             current_node = start_nodes.pop(0)
             current_node["select"] = True
@@ -178,7 +195,7 @@ class Graph(nx.Graph):
                     if not check_this["select"]:
                         start_nodes.append(check_this)
 
-    def check_visible_neigh_gh(self, start_nodes):
+    def check_visible_neigh(self, start_nodes):
         while len(start_nodes) > 0:
             current_node = start_nodes.pop(0)
             current_node["select"] = True
@@ -191,12 +208,43 @@ class Graph(nx.Graph):
 
             for i, elem in enumerate(neighbours_indexes):
                 check_this = self.nodes[elem]
+                if check_this["select"]:
+                    continue
                 result = checking(check_this["params"], add_params, neighbours)
                 if not result:
                     self.remove_edge(current_node["name"], check_this["name"])
                 else:
-                    if not check_this["select"]:
-                        start_nodes.append(check_this)
+                    start_nodes.append(check_this)
+
+    def check_visible_neigh_with_ts(self, start_nodes):
+        pca = PCA(n_components=2)
+        while len(start_nodes) > 0:
+            current_node = start_nodes.pop(0)
+            current_node["select"] = True
+            if len(list(self.neighbors(current_node["name"]))) == 0:
+                continue
+            neighbours = sorted(self[current_node["name"]].items(), key=lambda edge: edge[1]["weight"])
+
+            for check_this_index in neighbours:
+                check_this = self.nodes[check_this_index[0]]
+                if check_this["select"]:
+                    continue
+                flag = False
+                for neighbour_index in self.neighbors(current_node["name"]):
+                    neighbour = self.nodes[neighbour_index]
+                    if check_this["name"] == neighbour["name"]:
+                        continue
+                    new_params = pca.fit_transform([current_node["params"] - neighbour["params"], check_this["params"] - neighbour["params"]])
+                    value = np.dot(new_params[0], new_params[1])
+
+                    if value < 0:
+                        flag = True
+                        break
+
+                if flag:
+                    self.remove_edge(current_node["name"], check_this["name"])
+                else:
+                    start_nodes.append(check_this)
 
     @staticmethod
     @njit
