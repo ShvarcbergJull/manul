@@ -6,9 +6,15 @@ from scipy.io.arff import loadarff
 import numpy as np
 import matplotlib.pyplot as plt
 from numba import njit
+import warnings
 
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from sklearn.metrics import roc_curve
+
+from base.network import Graph
+
+
+warnings.filterwarnings("ignore")
 
 @njit
 def distance(p, q, matrix):
@@ -46,6 +52,16 @@ def find_manifold_loss(f_data, f_x):
     loss = np.dot(part_1, f_x)
 
     return loss.reshape(-1)[0]
+
+def find_graph_loss(graph, f_x, indexs):
+    adject = graph.kernel.A.todense()[indexs][:, indexs]
+    krdf = graph.kernel._K.todense()[indexs][:, indexs]
+
+    laplassian = adject - krdf
+    part_1 = np.dot(f_x.T, laplassian)
+    loss = np.dot(part_1, f_x)
+
+    return loss
 
 def baseline(dim):
     baseline_model = nn.Sequential(
@@ -130,12 +146,16 @@ train_target = target
 
 param = len(target) // 100 * 80
 train_features = grid_flattened[:param]
-train_target = target[:param]
+train_target = torch.tensor(target)[:param]
 test_features = grid_flattened[param:]
-test_target = target[param:]
+test_target = torch.tensor(target)[param:]
 
-train_target = torch.tensor(train_target)
-test_target = torch.tensor(test_target)
+
+
+
+
+# train_target = torch.tensor(train_target)
+# test_target = torch.tensor(test_target)   
 
 # print(len(train_target[train_target==0]), len(train_target[train_target==1]))
 # print(len(test_target[test_target==0]), len(test_target[test_target==1]))
@@ -146,9 +166,9 @@ print("TEST:", len(test_target))
 
 print("TRAIN 1")
 
-batch_size = 750
+batch_size = 50
 # num_epochs = 2000
-num_epochs = 500
+num_epochs = 100
 min_loss, t = np.inf, 0
 threshold = None
 for epoch in range(num_epochs):
@@ -227,13 +247,17 @@ print("TRAIN:", len(train_target))
 print("TEST:", len(test_target))
 print("TRAIN 2")
 
-batch_size = 750
+batch_size = 50
 # num_epochs = 2000
-num_epochs = 500
+num_epochs = 100
 min_loss, t = np.inf, 0
 val = np.min([batch_size, len(feature)])
 lmd = 1/(val ** 2)
 threshold = None
+graph = Graph(train_features, train_target, 20)
+# L = graph.kernel.A - graph.kernel._K
+# loss = np.dot(train_features.T, L)
+# loss = np.dot(loss, train_features) 
 # lmd = 0.01
 for epoch in range(num_epochs):
     permutation = torch.randperm(train_features.size()[0])
@@ -246,7 +270,9 @@ for epoch in range(num_epochs):
         target_y = target_y.to(torch.float64)
         x_optimizer.zero_grad()
         output = x_model(batch_x)
-        add_loss = find_manifold_loss(batch_x.numpy(), output.detach().numpy())
+
+        add_loss = find_graph_loss(graph, output.detach().numpy(), indices)
+        # add_loss = find_manifold_loss(batch_x.numpy(), output.detach().numpy())
         loss = criterion(output, target_y.reshape_as(output))
 
         fpr, tpr, thresholds = roc_curve(target_y.reshape(-1), output.detach().numpy().reshape(-1))
@@ -259,7 +285,7 @@ for epoch in range(num_epochs):
         # loss = torch.mean(torch.abs(target_y-output))
         # print(lmd * add_loss)
         # print(loss, lmd*add_loss[0])
-        loss += lmd * add_loss
+        loss += lmd * torch.tensor(add_loss[0, 0])
         
         # print(type(loss))
         loss.backward()

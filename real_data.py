@@ -18,12 +18,14 @@ import topo as tp
 import base.methods as mth
 from base.network import Graph
 
+import umap
+
 
 if __name__ == "__main__":
     R = 5
     n = 1000
 
-    dn = 2
+    dn = 1
 
     theta = np.random.random(size=n) * 2 * np.pi
     phi = np.random.random(size=n) * np.pi
@@ -134,32 +136,170 @@ if __name__ == "__main__":
     # real data
     dn = 1
 
-    raw_data = loadarff("data/phpSSK7iA.arff")
+    data = load_breast_cancer(return_X_y=True, as_frame=True)
+    feature = data[0]
+    target = data[1]
+
+
+    raw_data = loadarff("data/electricity-normalized.arff")
     df_data = pd.DataFrame(raw_data[0])
-    random_index = np.random.randint(0, 3750, size=1876)
-    df_data = df_data.iloc[random_index]
-    target = df_data['target'].to_numpy()
-    target[target==b'1'] = 1
-    target[target==b'0'] = 0
-    target = target.astype(int)
+    df_data['day'] = df_data['day'].astype('int32')
+    up_data = df_data[df_data['class']==b'UP'][:2500]
+    down_data = df_data[df_data['class']==b'DOWN'][:2500]
 
-    ks = list(df_data.keys())
-    ks = ks[:-1]
-    feature = df_data[ks]
+    work_data = up_data[:2000]
+    work_data = work_data.append(down_data[:2000])
+    work_data = work_data.append(up_data[2000:])
+    work_data = work_data.append(down_data[2000:])
 
-    print("FEAT", feature.values.shape)
-    print("TARGET", target)
+    # work_data = df_data[:5000]
+    # work_data = df_data
+
+    target = work_data['class'].to_numpy()
+    target[target==b'UP'] = 1
+    target[target==b'DOWN'] = 0
+    target = target.astype(dtype=int)
+    feature = work_data[['date', 'day', 'period', 'nswprice', 'nswdemand', 'vicprice', 'vicdemand', 'transfer']]
+
+    # raw_data = loadarff("data/phpSSK7iA.arff")
+    # df_data = pd.DataFrame(raw_data[0])
+    # target = df_data['target']
+    # target[target==b'1'] = 1
+    # target[target==b'0'] = 0
+    # target = target.astype(int)
+
+    # ks = list(df_data.keys())
+    # ks = ks[:-1]
+    # feature = df_data[ks]
 
     data, avg_of_data, var_of_data = mth.prebording_data(feature.values)
 
-    graph = Graph(data, target)
+    # embedding = umap.UMAP(n_neighbors=500,
+    #                   min_dist=0.4,
+    #                   metric='cosine').fit_transform(data)
+    
+    # plt.scatter(embedding[:, 0], embedding[:, 1], c=target)
+    # plt.show()
+    
+    # print("find")
+
+
+    graph = Graph(data, target, 3)
+    print(len(graph.edges))
     # graph.drawing.draw_graph()
 
     # kernel = tp.tpgraph.Kernel(n_neighbors=10, n_jobs=1, metric='cosine')
     # kernel.fit(data)
 
-    diff_op_isomap = tp.lt.Projector(projection_method='Isomap', metric='precomputed').fit_transform(graph.kernel.P)
+    diff_op_isomap = tp.lt.Projector(n_components=2, projection_method='MAP', metric='precomputed').fit_transform(graph.kernel.P)
     tp.pl.scatter(diff_op_isomap, labels=target, pt_size=6)
 
     print("finish")
-    
+
+    # choose_node = None
+    # for node in graph.nodes.values():
+    #     if not choose_node:
+    #         choose_node = node
+    #     elif len(list(graph.neighbors(node["name"]))) > len(list(graph.neighbors(choose_node["name"]))):
+    #         choose_node = node
+
+    # graph.check_visible_neigh_with_ts([choose_node])
+    # print(len(graph.edges))
+
+    # choosen_nodes = graph.search_nodes(dn, choose_node)
+
+    # base_points = choosen_nodes.copy()
+
+    # for choosen_node in base_points:
+    #     choosen_node["min_distance"] = 0
+    #     choosen_node["from_node"] = None
+    #     graph.dijkstra([choosen_node])
+
+    # print("end")
+
+    # keys = ["r", "b", "g"]
+    # picture = {}
+
+    # for index_key, choosen_node in enumerate(base_points):     
+    #     data_for_pca, colors_pca = graph.get_data_for_pca(choosen_node)
+    #     data_for_pca = np.array(data_for_pca)
+
+    #     # temp_avg = []
+    #     # temp_var = []
+
+    #     # for i in range(len(data_for_pca[0])):
+    #     #     temp_avg.append(np.average(data_for_pca[:, i]))
+    #     #     temp_var.append(np.var(data_for_pca[:, i]))
+
+    #     # graph.avg = temp_avg
+    #     # graph.var = temp_var
+
+    #     # start_count_components = data_for_pca.shape[1]
+
+    #     # for i, value in enumerate(data_for_pca):
+    #     #     data_for_pca[i] = (value - graph.avg) / graph.var
+
+    #     # pca = PCA(n_components=start_count_components)
+    #     # pca.fit(data_for_pca)
+    #     # values = pca.singular_values_
+
+    #     # diffs = values[:-1] - values[1:]
+    #     # print(diffs)
+    #     # mx = np.max(diffs)
+    #     # splt_index = np.argmax(diffs)
+
+    #     # newN = len(data_for_pca[:(splt_index+1)])
+    #     newN = 2
+    #     # print(newN)
+
+    #     pca = PCA(n_components=newN)
+    #     pca.fit(data_for_pca)
+    #     print(pca.singular_values_)
+    #     result = pca.transform(data_for_pca)
+
+    #     # center = result[0]
+
+    #     # for i in range(len(result)-1, -1, -1):
+    #     #     result[i] = result[i] - result[0]
+
+    #     graph.set_new_params(choosen_node, result)
+
+    #     graph.find_raw_params(pca)
+
+    #     plt.scatter(result[0, 0], result[0, 1], c=["r"])
+    #     plt.scatter(result[1:, 0], result[1:, 1])
+    #     plt.show()
+
+    #     nodes = [graph.nodes[index_node] for index_node in graph.neighbors(choosen_node["name"])]
+    #     other_nodes = graph.transform_nodes(nodes, result, choosen_node)
+    #     print(f"LEN other POINTS: {len(other_nodes)} + {len(result)}")
+
+    #     a = [x_node["params"] for x_node in nodes]
+    #     b = [x_node["params"] for x_node in other_nodes]
+
+    #     a.extend(b)
+
+    #     picture[keys[index_key]] = np.array(a)
+
+    #     # other_nodes = graph.get_other_nodes()
+    #     # other_nodes = pca.transform(other_nodes)
+        
+    #     # other_points = np.array(other_nodes)
+    #     other_points = np.array([x_node["new_params"] for x_node in other_nodes])
+    #     other_colors = np.array([x_node["color"] for x_node in other_nodes])
+
+    #     # plt.scatter(result[0, 0], result[0, 1], color="r")
+    #     # plt.scatter(result[1:, 0], result[1:, 1])
+    #     plt.scatter(result[:, 0], result[:, 1], c=colors_pca)
+    #     try:
+    #         # plt.scatter(other_points[:, 0], other_points[:, 1], color="g")
+    #         plt.scatter(other_points[:, 0], other_points[:, 1], c=other_colors)
+    #     except Exception as e:
+    #         print(f"FALL: {e}")
+    #         print(other_points)
+    #     plt.show()
+
+    #     # info_for_draw = [choose_node]
+    #     # info_for_draw.extend(choose_node.neighbours)
+    #     # info_for_draw.extend(other_nodes)
+    #     # graph.drawing.draw_graph(mode=1, data=info_for_draw)

@@ -60,11 +60,13 @@ class Draw:
         nodes = []
         edges = []
         colors = []
+        pairs = []
 
         for node in self.graph.nodes():
             nodes.append(node.params())
             colors.append(node.color())
             for neigh in node.neighbours():
+                pairs.append((node.name(), neigh[1].name()))
                 edges.append(node.params())
                 edges.append(neigh[1].params())
                 edges.append([None for i in range(len(node.params()))])         
@@ -77,7 +79,7 @@ class Draw:
         #     edges.append(self.graph.nodes[edge[0]]["params"])
         #     edges.append(self.graph.nodes[edge[1]]["params"])
         #     edges.append([None for i in range(len(self.graph.nodes[edge[0]]["params"]))])
-        
+        print(len(pairs))
         nodes = np.array(nodes).T
         edges = np.array(edges).T
     

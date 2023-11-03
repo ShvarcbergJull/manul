@@ -20,6 +20,7 @@ from sklearn.decomposition import PCA
 from sklearn.datasets import make_swiss_roll
 
 from base.network import Graph # , Edge
+import base.methods as mth
 
 def baseline(dim):
     baseline_model = nn.Sequential(
@@ -148,16 +149,25 @@ if __name__ == "__main__":
     # y = sorted_data[:, 1]
     # z = sorted_data[:, 2]
 
-    fir = plt.figure()
-    ax = plt.axes(projection = '3d')
+    # fir = plt.figure()
+    # ax = plt.axes(projection = '3d')
 
-    ax.scatter(x, y, z, c=colors)
+    # ax.scatter(x, y, z, c=colors)
 
-    plt.show()
+    # plt.show()
 
-    data = np.array([x, y, z]).T
+    # data = np.array([x, y, z]).T
+
+    data = load_breast_cancer(return_X_y=True, as_frame=True)
+    colors = data[1]
+    data = data[0]
+
+    data, avg_of_data, var_of_data = mth.prebording_data(data.values)
+
     time_start = time.time()
     graph = Graph(data=data, colors=colors)
+    graph.var = var_of_data
+    graph.avg = avg_of_data
     print("--- %s seconds ---" % (time.time() - time_start))
 
     print(graph)
@@ -199,6 +209,7 @@ if __name__ == "__main__":
     
     time_start = time.time()
     graph.check_visible_neigh([choose_node])
+    # graph.check_visible_neigh_with_ts([choose_node])
     print("--- %s seconds ---" % (time.time() - time_start))
     
     # graph.draw()

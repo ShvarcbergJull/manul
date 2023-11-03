@@ -42,20 +42,20 @@ def checking(node_param, neighbour_params, neighbours):
 
 class Graph(nx.Graph):
 
-    def __init__(self, data, colors=None, incoming_graph_data=None, **attr):
+    def __init__(self, data, colors=None, n_neighbors = 10, incoming_graph_data=None, **attr):
         super().__init__(incoming_graph_data, **attr)
         self.avg = []
         self.var = []
         i = 0
 
-        while i < len(data[0]):
-            variance = np.var(data[:, i])
-            if variance == 0:
-                data = np.delete(data, i, 1)
-                continue
-            self.avg.append(np.average(data[:, i]))
-            self.var.append(variance)
-            i += 1
+        # while i < len(data[0]):
+        #     variance = np.var(data[:, i])
+        #     if variance == 0:
+        #         data = np.delete(data, i, 1)
+        #         continue
+        #     self.avg.append(np.average(data[:, i]))
+        #     self.var.append(variance)
+        #     i += 1
     
         for i, elem in enumerate(data):
             color = None
@@ -66,12 +66,12 @@ class Graph(nx.Graph):
         self._source_data = data
 
         self.matrix_connect = np.zeros((self.number_of_nodes(), self.number_of_nodes()))
-        self.kernel = tp.tpgraph.Kernel(n_neighbors=500, n_jobs=1, metric='cosine')
+        self.kernel = tp.tpgraph.Kernel(n_neighbors=n_neighbors, n_jobs=1, metric='cosine', backend="hnswlib", verbose=True)
         self.kernel.fit(data)
 
         self.connected = self.kernel.A.todense()
         # self.find_ED(0.4)
-        self.find_graph(0.1)
+        self.find_graph(0.5)
         self.drawing = Draw(self)
 
     @staticmethod
