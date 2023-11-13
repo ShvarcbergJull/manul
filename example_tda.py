@@ -21,7 +21,7 @@ from gtda.mapper import (
 
 # ML tools
 from sklearn import datasets
-from sklearn.cluster import DBSCAN
+from sklearn.cluster import DBSCAN, AffinityPropagation
 from sklearn.decomposition import PCA
 
 
@@ -95,10 +95,12 @@ if __name__ == "__main__":
 
     data, avg_of_data, var_of_data = mth.prebording_data(feature.values)
 
+    indexs_for_project = np.argsort(var_of_data)
 
-    filter_func = Projection(columns=[i for i in range(data.shape[1])])
-    cover = CubicalCover(n_intervals=100, overlap_frac=0.6)
+    filter_func = Projection(columns=list(indexs_for_project[-3:]))
+    cover = CubicalCover(n_intervals=4, overlap_frac=0.3)
     clusterer = DBSCAN()
+    # clusterer = AffinityPropagation()
 
     n_jobs = 1
 
@@ -106,9 +108,11 @@ if __name__ == "__main__":
         filter_func=filter_func,
         cover=cover,
         clusterer=clusterer,
-        verbose=False,
+        verbose=True,
         n_jobs=n_jobs,
     )
+
+    result = pipe.fit_transform(data, target)
 
     fig = plot_static_mapper_graph(pipe, data)
     fig.show(config={'scrollZoom': True})
