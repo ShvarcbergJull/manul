@@ -19,7 +19,8 @@ from sklearn.metrics import roc_curve
 from sklearn.decomposition import PCA
 from sklearn.datasets import make_swiss_roll
 
-from base.network import Graph # , Edge
+# from base.network import Graph # , Edge
+from base.structure import Graph
 import base.methods as mth
 
 def baseline(dim):
