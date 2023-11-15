@@ -157,13 +157,13 @@ if __name__ == "__main__":
 
     # plt.show()
 
-    # data = np.array([x, y, z]).T
+    data = np.array([x, y, z]).T
 
-    data = load_breast_cancer(return_X_y=True, as_frame=True)
-    colors = data[1]
-    data = data[0]
+    # data = load_breast_cancer(return_X_y=True, as_frame=True)
+    # colors = data[1]
+    # data = data[0]
 
-    data, avg_of_data, var_of_data = mth.prebording_data(data.values)
+    data, avg_of_data, var_of_data = mth.prebording_data(data)
 
     time_start = time.time()
     graph = Graph(data=data, colors=colors)

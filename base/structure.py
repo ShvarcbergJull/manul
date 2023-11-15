@@ -1,12 +1,12 @@
 from numba import njit, typed
 import numpy as np
+import torch
 from itertools import combinations, product
 
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 
 import networkx as nx
-import topo as tp
 import plotly.graph_objects as go
 from sklearn.metrics.pairwise import euclidean_distances
 from sklearn.decomposition import PCA
@@ -38,6 +38,13 @@ def find_norma(params):
 def checking(node_param, neighbour_params, neighbours):
     neigh_2 = node_param - neighbour_params
     result = np.diag(np.dot(neighbours, neigh_2.T))
+    if len(result[result < 0]) > 0:
+        return False
+    return True
+
+def checking_1(node_param, neighbour_params, neighbours):
+    neigh_2 = torch.sub(node_param, neighbour_params)
+    result = torch.diagonal(torch.mm(neighbours, neigh_2.T))
     if len(result[result < 0]) > 0:
         return False
     return True
@@ -136,59 +143,6 @@ class Graph(nx.Graph):
         for node in self.nodes:
             self.nodes[node]["visit"] = False
     
-    # @profile
-    def check_visible_neigh_b(self, start_nodes):
-        while len(start_nodes) > 0:
-            current_node = start_nodes.pop(0)
-            current_node["select"] = True
-            if len(list(self.neighbors(current_node["name"]))) == 0:
-                continue
-            neighbours = sorted(self[current_node["name"]].items(), key=lambda edge: edge[1]["weight"])
-
-            for check_this_index in neighbours:
-                check_this = self.nodes[check_this_index[0]]
-                if check_this["select"]:
-                    continue
-                flag = False
-                for neighbour_index in self.neighbors(current_node["name"]):
-                    neighbour = self.nodes[neighbour_index]
-                    if check_this["name"] == neighbour["name"]:
-                        continue
-                    value = np.dot(current_node["params"] - neighbour["params"], check_this["params"] - neighbour["params"])
-
-                    if value < 0:
-                        flag = True
-                        break
-
-                if flag:
-                    self.remove_edge(current_node["name"], check_this["name"])
-                else:
-                    start_nodes.append(check_this)
-            # new_neighbours_indexs = sorted(self[current_node["name"]].items(), key=lambda edge: edge[1]["weight"])
-            # new_neighbours_indexs = filter(lambda index: not self.nodes[index[0]]["select"], new_neighbours_indexs)
-            # start_nodes.extend([self.nodes[x[0]] for x in new_neighbours_indexs])
-
-    def check_visible_neigh_gh(self, start_nodes):
-        while len(start_nodes) > 0:
-            current_node = start_nodes.pop(0)
-            current_node["select"] = True
-            if len(list(self.neighbors(current_node["name"]))) == 0:
-                continue
-            neighbours_indexes = sorted(self[current_node["name"]].items(), key=lambda edge: edge[1]["weight"])
-            neighbours_indexes = np.array(list(zip(*neighbours_indexes))[0])
-            add_params = np.array([self.nodes[node]["params"] for node in neighbours_indexes])
-            neighbours = np.array(current_node["params"]) - add_params
-
-            for i, elem in enumerate(neighbours_indexes):
-                check_this = self.nodes[elem]
-                neigh_2 = np.array(check_this["params"]) - add_params
-                result = np.diag(np.dot(neighbours, neigh_2.T))
-                if len(result[result < 0]) > 0:
-                    self.remove_edge(current_node["name"], check_this["name"])
-                else:
-                    if not check_this["select"]:
-                        start_nodes.append(check_this)
-
     def check_visible_neigh(self, start_nodes):
         while len(start_nodes) > 0:
             current_node = start_nodes.pop(0)
@@ -197,45 +151,15 @@ class Graph(nx.Graph):
                 continue
             neighbours_indexes = sorted(self[current_node["name"]].items(), key=lambda edge: edge[1]["weight"])
             neighbours_indexes = np.array(list(zip(*neighbours_indexes))[0])
-            add_params = np.array([self.nodes[node]["params"] for node in neighbours_indexes])
-            neighbours = np.array(current_node["params"]) - add_params
+            add_params = torch.Tensor([self.nodes[node]["params"] for node in neighbours_indexes])
+            neighbours = torch.sub(torch.Tensor(current_node["params"]), add_params)
 
             for i, elem in enumerate(neighbours_indexes):
                 check_this = self.nodes[elem]
                 if check_this["select"]:
                     continue
-                result = checking(check_this["params"], add_params, neighbours)
+                result = checking_1(torch.from_numpy(check_this["params"]), add_params, neighbours)
                 if not result:
-                    self.remove_edge(current_node["name"], check_this["name"])
-                else:
-                    start_nodes.append(check_this)
-
-    def check_visible_neigh_with_ts(self, start_nodes):
-        pca = PCA(n_components=2)
-        while len(start_nodes) > 0:
-            current_node = start_nodes.pop(0)
-            current_node["select"] = True
-            if len(list(self.neighbors(current_node["name"]))) == 0:
-                continue
-            neighbours = sorted(self[current_node["name"]].items(), key=lambda edge: edge[1]["weight"])
-
-            for check_this_index in neighbours:
-                check_this = self.nodes[check_this_index[0]]
-                if check_this["select"]:
-                    continue
-                flag = False
-                for neighbour_index in self.neighbors(current_node["name"]):
-                    neighbour = self.nodes[neighbour_index]
-                    if check_this["name"] == neighbour["name"]:
-                        continue
-                    new_params = pca.fit_transform([current_node["params"] - neighbour["params"], check_this["params"] - neighbour["params"]])
-                    value = np.dot(new_params[0], new_params[1])
-
-                    if value < 0:
-                        flag = True
-                        break
-
-                if flag:
                     self.remove_edge(current_node["name"], check_this["name"])
                 else:
                     start_nodes.append(check_this)
