@@ -11,7 +11,7 @@ import warnings
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from sklearn.metrics import roc_curve
 
-from base.network import Graph
+from base.structure import Graph
 
 
 warnings.filterwarnings("ignore")
@@ -255,7 +255,7 @@ min_loss, t = np.inf, 0
 val = np.min([batch_size, len(feature)])
 lmd = 1/(val ** 2)
 threshold = None
-graph = Graph(train_features, train_target, 30)
+graph = Graph(train_features, train_target)
 # L = graph.kernel.A - graph.kernel._K
 # loss = np.dot(train_features.T, L)
 # loss = np.dot(loss, train_features) 

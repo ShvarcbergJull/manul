@@ -1,4 +1,4 @@
-from numba import njit, typed
+from numba import njit, types
 import numpy as np
 import torch
 from itertools import combinations, product
@@ -13,6 +13,9 @@ from sklearn.decomposition import PCA
 # from line_profiler import profile
 
 # import lib
+
+EPS = -1e-9
+device = torch.device('cuda')
 
 @njit
 def distance(p_params, q_params):
@@ -35,16 +38,48 @@ def find_norma(params):
     return np.sqrt(result)
 
 @njit
+def helper(eds, norm_eds, i, node_neigh, all_nodes, eps, source_data, check_nodes):
+    return_values = np.array([])
+    indx_neighbours = np.argsort(eds[i])
+    # indx_neighbours = np.delete(indx_neighbours, np.argwhere(indx_neighbours == i))
+    print(np.argwhere(indx_neighbours != i))
+    print(np.argwhere(indx_neighbours != i)[0])
+    indx_neighbours = indx_neighbours[np.argwhere(indx_neighbours != i)[0]]
+    if len(node_neigh) == 0:
+        node_neigh = np.append(node_neigh, indx_neighbours[0])
+        all_nodes = np.append(all_nodes, indx_neighbours[0])
+    # indx_neighbours  = np.delete(indx_neighbours, np.argwhere(np.intersect1d(indx_neighbours, node_neigh)))
+    # indx_neighbours  = np.delete(indx_neighbours, np.argwhere(np.intersect1d(indx_neighbours, check_nodes)))
+    indx_neighbours  = indx_neighbours[np.argwhere(np.logical_not(np.intersect1d(indx_neighbours, node_neigh)))[0]]
+    indx_neighbours  = indx_neighbours[np.argwhere(np.logical_not(np.intersect1d(indx_neighbours, check_nodes)))[0]]
+    for j in indx_neighbours:
+        if norm_eds[i][j] <= eps:
+            neighbours = source_data[i] - source_data[node_neigh]
+            check = source_data[j] - source_data[node_neigh]
+            result = np.diag(np.dot(neighbours, check.T))
+            if len(result[result < 0]) > 0:
+                continue
+            node_neigh = np.append(node_neigh, j)
+            all_nodes = np.append(all_nodes, j)
+            return_values = np.append(return_values, j)
+        else:
+            break
+    
+    return (all_nodes, return_values) 
+@njit
 def checking(node_param, neighbour_params, neighbours):
     neigh_2 = node_param - neighbour_params
     result = np.diag(np.dot(neighbours, neigh_2.T))
+    # print(len(result[result < 0]))
     if len(result[result < 0]) > 0:
         return False
     return True
 
 def checking_1(node_param, neighbour_params, neighbours):
     neigh_2 = torch.sub(node_param, neighbour_params)
-    result = torch.diagonal(torch.mm(neighbours, neigh_2.T))
+    neigh_2.to(device)
+    result = torch.round(torch.diag(torch.mm(neighbours.type_as(neigh_2), neigh_2.T)), decimals=4)
+    # print(len(result[result < 0]))
     if len(result[result < 0]) > 0:
         return False
     return True
@@ -83,6 +118,7 @@ class Graph(nx.Graph):
 
         self.matrix_connect = np.zeros((self.number_of_nodes(), self.number_of_nodes()))
         self.find_ED(0.4)
+        # self.find_ED_other_realisation(0.7)
         self.drawing = Draw(self)
 
     @staticmethod
@@ -96,14 +132,70 @@ class Graph(nx.Graph):
     def find_ED(self, eps):
         N = self.number_of_nodes()
         eds = euclidean_distances(self._source_data, self._source_data)
+        self.matrix_connect = eds
 
         maxval = np.max(eds)
         for i in range(N):
-            for j in range(i, N):
+            indx_neighbours = np.argsort(eds[i])
+            indx_neighbours = np.delete(indx_neighbours, np.where(indx_neighbours == i))
+            node_neigh = [elem[0] for elem in self[i].items()]
+            if indx_neighbours[0] not in node_neigh:
+                node_neigh.append(indx_neighbours[0])
+            indx_neighbours  = np.delete(indx_neighbours, np.where(np.intersect1d(indx_neighbours, node_neigh)))
+            for j in indx_neighbours:
+                if eds[i][j]/maxval <= eps:
+                    neighbours = self._source_data[i] - self._source_data[node_neigh]
+                    check = self._source_data[j] - self._source_data[node_neigh]
+                    result = np.diag(np.dot(neighbours, check.T))
+                    if len(result[result < 0]) > 0:
+                        continue
+                    self.add_edge(i, j, weight=eds[i][j])
+                    node_neigh.append(j)
+
+    
+    def find_ED_other_realisation(self, eps):
+        N = self.number_of_nodes()
+        eds = euclidean_distances(self._source_data, self._source_data)
+
+        maxval = np.max(eds)
+        norm_eds = eds / maxval
+        first = np.argmax([len(norm_eds[i][norm_eds[i] <= eps]) for i in range(N)])
+        all_nodes = np.array([first])
+        check_nodes = []
+        while len(all_nodes) > 0:
+            i = all_nodes[0]
+            check_nodes.append(i)
+            all_nodes = all_nodes[1:]
+            node_neigh = np.array([elem[0] for elem in self[i].items()], dtype=np.int64)
+
+            print(i)
+            # all_nodes, neighbours = helper(eds, norm_eds, i, node_neigh, all_nodes, eps, self._source_data, check_nodes)
+            # print(i)
+
+            # for k in neighbours:
+            #     self.add_edge(i, k, weight=eds[i][k])
+            
+            indx_neighbours = np.argsort(eds[i])
+            indx_neighbours = np.delete(indx_neighbours, np.where(indx_neighbours == i))
+            print(node_neigh.dtype)
+            if len(node_neigh) == 0:
+                node_neigh = np.append(node_neigh, indx_neighbours[0])
+                all_nodes = np.append(all_nodes, indx_neighbours[0])
+            indx_neighbours  = np.delete(indx_neighbours, np.where(np.intersect1d(indx_neighbours, node_neigh)))
+            indx_neighbours  = np.delete(indx_neighbours, np.where(np.intersect1d(indx_neighbours, check_nodes)))
+            for j in indx_neighbours:
                 self.matrix_connect[i][j] = eds[i][j]
                 self.matrix_connect[j][i] = eds[i][j]
-                if eds[i][j]/maxval <= eps:
+                if norm_eds[i][j] <= eps:
+                    neighbours = self._source_data[i] - self._source_data[node_neigh]
+                    check = self._source_data[j] - self._source_data[node_neigh]
+                    result = np.diag(np.dot(neighbours, check.T))
+                    if len(result[result < 0]) > 0:
+                        continue
                     self.add_edge(i, j, weight=eds[i][j])
+                    node_neigh = np.append(node_neigh, j)
+                    all_nodes = np.append(all_nodes, j)
+
 
     def find_graph(self, eps):
         max_value = np.max(self.kernel.SP)
@@ -151,14 +243,25 @@ class Graph(nx.Graph):
                 continue
             neighbours_indexes = sorted(self[current_node["name"]].items(), key=lambda edge: edge[1]["weight"])
             neighbours_indexes = np.array(list(zip(*neighbours_indexes))[0])
-            add_params = torch.Tensor([self.nodes[node]["params"] for node in neighbours_indexes])
+            add_params = torch.from_numpy(np.array([self.nodes[node]["params"] for node in neighbours_indexes]))
             neighbours = torch.sub(torch.Tensor(current_node["params"]), add_params)
+
+            add_params.to(device)
+            neighbours.to(device)
+
+            add_params1 = np.array([self.nodes[node]["params"] for node in neighbours_indexes])
+            neighbours1 = current_node["params"] - add_params1
 
             for i, elem in enumerate(neighbours_indexes):
                 check_this = self.nodes[elem]
                 if check_this["select"]:
                     continue
-                result = checking_1(torch.from_numpy(check_this["params"]), add_params, neighbours)
+                prms_check = torch.from_numpy(check_this["params"])
+                prms_check.to(device)
+                result = checking_1(prms_check, add_params, neighbours)
+                # result1 = checking(check_this["params"], add_params1, neighbours1)
+                # if result1 != result:
+                #     print("opopo")
                 if not result:
                     self.remove_edge(current_node["name"], check_this["name"])
                 else:

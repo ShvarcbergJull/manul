@@ -208,14 +208,14 @@ if __name__ == "__main__":
         elif len(list(graph.neighbors(node["name"]))) > len(list(graph.neighbors(choose_node["name"]))):
             choose_node = node
     
-    time_start = time.time()
-    graph.check_visible_neigh([choose_node])
-    # graph.check_visible_neigh_with_ts([choose_node])
-    print("--- %s seconds ---" % (time.time() - time_start))
+    # time_start = time.time()
+    # graph.check_visible_neigh([choose_node])
+    # # graph.check_visible_neigh_with_ts([choose_node])
+    # print("--- %s seconds ---" % (time.time() - time_start))
     
-    # graph.draw()
-    print(len(graph.edges))
-    graph.drawing.draw_graph()
+    # # graph.draw()
+    # print(len(graph.edges))
+    # graph.drawing.draw_graph()
 
     # choosen_node = None
     # for node in graph.nodes:
@@ -301,7 +301,7 @@ if __name__ == "__main__":
         # graph.avg = temp_avg
         # graph.var = temp_var
 
-        start_count_components = data_for_pca.shape[1]
+        start_count_components = np.min(data_for_pca.shape)
 
         for i, value in enumerate(data_for_pca):
             data_for_pca[i] = (value - graph.avg) / graph.var
