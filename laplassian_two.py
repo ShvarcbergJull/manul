@@ -54,11 +54,11 @@ def find_manifold_loss(f_data, f_x):
     return loss.reshape(-1)[0]
 
 def find_graph_loss(graph, f_x, indexs):
-    # adject = graph.kernel.A.todense()[indexs][:, indexs]
-    # krdf = graph.kernel._K.todense()[indexs][:, indexs]
+    adject = graph.A[indexs][:, indexs]
+    krdf = graph._K[indexs][:, indexs]
 
-    # laplassian = adject - krdf
-    laplassian = graph.kernel.L.todense()[indexs][:, indexs]
+    laplassian = adject - krdf
+    # laplassian = graph.kernel.L.todense()[indexs][:, indexs]
     part_1 = np.dot(f_x.T, laplassian)
     loss = np.dot(part_1, f_x)
 
@@ -167,48 +167,48 @@ print("TEST:", len(test_target))
 
 print("TRAIN 1")
 
-batch_size = 50
-# num_epochs = 2000
-num_epochs = 250
-min_loss, t = np.inf, 0
-threshold = None
-for epoch in range(num_epochs):
-    permutation = torch.randperm(train_features.size()[0])
-    loss_list = []
-    for i in range(0, len(train_target), batch_size):
-        indices = permutation[i:i+batch_size]
-        # print(indices)
-        batch_x, target_y = train_features[indices], train_target[indices]
-        target_y = target_y.to(torch.float64)
-        optimizer.zero_grad()
-        output = b_model(batch_x)
-        # output[output>0.5] = 1
-        # output[output<=0.5] = 0
-        # print(output.shape)
-        loss = criterion(output, target_y.reshape_as(output))
-        fpr, tpr, thresholds = roc_curve(target_y.reshape(-1), output.detach().numpy().reshape(-1))
-        gmeans = np.sqrt(tpr * (1-fpr))
-        ix = np.argmax(gmeans)
-        # print("IX", thresholds[ix])
-        if not threshold:
-            threshold = thresholds[ix]
-        else:
-            threshold = np.mean([thresholds[ix], threshold])
-        # loss = torch.mean(torch.abs(target_y-output))
-        # loss = np.mean(np.abs(output - (target_y.reshape_as(output)).detach().numpy()))
+# batch_size = 50
+# # num_epochs = 2000
+# num_epochs = 250
+# min_loss, t = np.inf, 0
+# threshold = None
+# for epoch in range(num_epochs):
+#     permutation = torch.randperm(train_features.size()[0])
+#     loss_list = []
+#     for i in range(0, len(train_target), batch_size):
+#         indices = permutation[i:i+batch_size]
+#         # print(indices)
+#         batch_x, target_y = train_features[indices], train_target[indices]
+#         target_y = target_y.to(torch.float64)
+#         optimizer.zero_grad()
+#         output = b_model(batch_x)
+#         # output[output>0.5] = 1
+#         # output[output<=0.5] = 0
+#         # print(output.shape)
+#         loss = criterion(output, target_y.reshape_as(output))
+#         fpr, tpr, thresholds = roc_curve(target_y.reshape(-1), output.detach().numpy().reshape(-1))
+#         gmeans = np.sqrt(tpr * (1-fpr))
+#         ix = np.argmax(gmeans)
+#         # print("IX", thresholds[ix])
+#         if not threshold:
+#             threshold = thresholds[ix]
+#         else:
+#             threshold = np.mean([thresholds[ix], threshold])
+#         # loss = torch.mean(torch.abs(target_y-output))
+#         # loss = np.mean(np.abs(output - (target_y.reshape_as(output)).detach().numpy()))
         
-        # print(loss)
-        loss.backward()
-        optimizer.step()
-        # print(loss.item())
-        loss_list.append(loss.item())
-    # print(loss_list)
-    loss_mean = np.mean(loss_list)
+#         # print(loss)
+#         loss.backward()
+#         optimizer.step()
+#         # print(loss.item())
+#         loss_list.append(loss.item())
+#     # print(loss_list)
+#     loss_mean = np.mean(loss_list)
 
-    t += 1
-    print('Surface training t={}, loss={}'.format(t, loss_mean))
+#     t += 1
+#     print('Surface training t={}, loss={}'.format(t, loss_mean))
 
-b_model.eval()
+# b_model.eval()
 # baseline_out = b_model(train_features)
 # baseline_out = baseline_out.detach().numpy()
 
@@ -236,12 +236,12 @@ baseline_out = baseline_out.detach().numpy()
 
 # baseline_out[baseline_out>0.5] = 1
 # baseline_out[baseline_out<=0.5] = 0
-baseline_out = np.where(baseline_out > threshold, 1, 0)
-# tn, fp, fn, tp = confusion_matrix(test_target.to_numpy(), baseline_out.reshape(-1)).ravel()
-cm = confusion_matrix(test_target.reshape(-1), baseline_out.reshape(-1))
-disp = ConfusionMatrixDisplay(confusion_matrix=cm)
-disp.plot()
-plt.show()
+# baseline_out = np.where(baseline_out > threshold, 1, 0)
+# # tn, fp, fn, tp = confusion_matrix(test_target.to_numpy(), baseline_out.reshape(-1)).ravel()
+# cm = confusion_matrix(test_target.reshape(-1), baseline_out.reshape(-1))
+# disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+# disp.plot()
+# plt.show()
 
 
 print("TRAIN:", len(train_target))
@@ -255,7 +255,7 @@ min_loss, t = np.inf, 0
 val = np.min([batch_size, len(feature)])
 lmd = 1/(val ** 2)
 threshold = None
-graph = Graph(train_features, train_target)
+graph = Graph(train_features.numpy(), train_target)
 # L = graph.kernel.A - graph.kernel._K
 # loss = np.dot(train_features.T, L)
 # loss = np.dot(loss, train_features) 

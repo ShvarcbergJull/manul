@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from numba import njit
 import warnings
 
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, f1_score
 from sklearn.metrics import roc_curve
 
 from base.network import Graph
@@ -110,6 +110,10 @@ target = target.astype(dtype=int)
 feature = work_data[['date', 'day', 'period', 'nswprice', 'nswdemand', 'vicprice', 'vicdemand', 'transfer']]
 '''
 
+with open("result.txt", "w") as fl:
+    fl.write("test")
+    fl.close()
+
 # третьи данные
 raw_data = loadarff("data/phpSSK7iA.arff")
 df_data = pd.DataFrame(raw_data[0])
@@ -125,16 +129,6 @@ feature = df_data[ks]
 
 
 dims = len(feature.keys())
-
-b_model = baseline(dims)
-criterion = nn.BCELoss()
-optimizer = torch.optim.Adam(b_model.parameters(), lr=1e-4, eps=1e-4)
-b_model.train()
-
-x_model = baseline(dims)
-criterion = nn.BCELoss()
-x_optimizer = torch.optim.Adam(x_model.parameters(), lr=1e-4, eps=1e-4)
-x_model.train()
 
 grid_tensors = [torch.tensor(feature[key].values) for key in feature.keys()]
 grid_tensor = torch.stack(grid_tensors)
@@ -162,171 +156,195 @@ test_target = torch.tensor(target)[param:]
 # print(len(test_target[test_target==0]), len(test_target[test_target==1]))
 # exit(1)
 
-print("TRAIN:", len(train_target))
-print("TEST:", len(test_target))
+F1 = []
+F2 = []
 
-print("TRAIN 1")
+for K in range(10):
+    b_model = baseline(dims)
+    criterion = nn.BCELoss()
+    optimizer = torch.optim.Adam(b_model.parameters(), lr=1e-4, eps=1e-4)
+    b_model.train()
 
-batch_size = 50
-# num_epochs = 2000
-num_epochs = 250
-min_loss, t = np.inf, 0
-threshold = None
-for epoch in range(num_epochs):
-    permutation = torch.randperm(train_features.size()[0])
-    loss_list = []
-    for i in range(0, len(train_target), batch_size):
-        indices = permutation[i:i+batch_size]
-        # print(indices)
-        batch_x, target_y = train_features[indices], train_target[indices]
-        target_y = target_y.to(torch.float64)
-        optimizer.zero_grad()
-        output = b_model(batch_x)
-        # output[output>0.5] = 1
-        # output[output<=0.5] = 0
-        # print(output.shape)
-        loss = criterion(output, target_y.reshape_as(output))
-        fpr, tpr, thresholds = roc_curve(target_y.reshape(-1), output.detach().numpy().reshape(-1))
-        gmeans = np.sqrt(tpr * (1-fpr))
-        ix = np.argmax(gmeans)
-        # print("IX", thresholds[ix])
-        if not threshold:
-            threshold = thresholds[ix]
-        else:
-            threshold = np.mean([thresholds[ix], threshold])
-        # loss = torch.mean(torch.abs(target_y-output))
-        # loss = np.mean(np.abs(output - (target_y.reshape_as(output)).detach().numpy()))
-        
-        # print(loss)
-        loss.backward()
-        optimizer.step()
-        # print(loss.item())
-        loss_list.append(loss.item())
-    # print(loss_list)
-    loss_mean = np.mean(loss_list)
+    x_model = baseline(dims)
+    criterion = nn.BCELoss()
+    x_optimizer = torch.optim.Adam(x_model.parameters(), lr=1e-4, eps=1e-4)
+    x_model.train()
 
-    t += 1
-    print('Surface training t={}, loss={}'.format(t, loss_mean))
+    print("TRAIN:", len(train_target))
+    print("TEST:", len(test_target))
 
-b_model.eval()
-# baseline_out = b_model(train_features)
-# baseline_out = baseline_out.detach().numpy()
+    print("TRAIN 1")
 
-# fpr, tpr, thresholds = roc_curve(train_target.reshape(-1), baseline_out.reshape(-1))
+    batch_size = 50
+    # num_epochs = 2000
+    num_epochs = 100
+    min_loss, t = np.inf, 0
+    threshold = None
+    for epoch in range(num_epochs):
+        permutation = torch.randperm(train_features.size()[0])
+        loss_list = []
+        for i in range(0, len(train_target), batch_size):
+            indices = permutation[i:i+batch_size]
+            # print(indices)
+            batch_x, target_y = train_features[indices], train_target[indices]
+            target_y = target_y.to(torch.float64)
+            optimizer.zero_grad()
+            output = b_model(batch_x)
+            # output[output>0.5] = 1
+            # output[output<=0.5] = 0
+            # print(output.shape)
+            loss = criterion(output, target_y.reshape_as(output))
+            fpr, tpr, thresholds = roc_curve(target_y.reshape(-1), output.detach().numpy().reshape(-1))
+            gmeans = np.sqrt(tpr * (1-fpr))
+            ix = np.argmax(gmeans)
+            # print("IX", thresholds[ix])
+            if not threshold:
+                threshold = thresholds[ix]
+            else:
+                threshold = np.mean([thresholds[ix], threshold])
+            # loss = torch.mean(torch.abs(target_y-output))
+            # loss = np.mean(np.abs(output - (target_y.reshape_as(output)).detach().numpy()))
+            
+            # print(loss)
+            loss.backward()
+            optimizer.step()
+            # print(loss.item())
+            loss_list.append(loss.item())
+        # print(loss_list)
+        loss_mean = np.mean(loss_list)
 
-# gmeans = np.sqrt(tpr * (1-fpr))
-# ix = np.argmax(gmeans)
-# threshold = thresholds[ix]
+        t += 1
+        print('Surface training t={}, loss={}'.format(t, loss_mean))
 
-baseline_out = b_model(test_features)
-baseline_out = baseline_out.detach().numpy()
+    b_model.eval()
+    # baseline_out = b_model(train_features)
+    # baseline_out = baseline_out.detach().numpy()
 
-# fpr, tpr, thresholds = roc_curve(test_target.reshape(-1), baseline_out.reshape(-1))
+    # fpr, tpr, thresholds = roc_curve(train_target.reshape(-1), baseline_out.reshape(-1))
 
-# gmeans = np.sqrt(tpr * (1-fpr))
-# ix = np.argmax(gmeans)
-# print('Best Threshold=%f, G-Mean=%.3f' % (thresholds[ix], gmeans[ix]))
+    # gmeans = np.sqrt(tpr * (1-fpr))
+    # ix = np.argmax(gmeans)
+    # threshold = thresholds[ix]
 
-# plt.plot([0,1], [0,1], linestyle='--', label='No Skill')
-# plt.plot(fpr, tpr, marker='.', label='Logistic')
-# plt.xlabel('False Positive Rate')
-# plt.ylabel('True Positive Rate')
-# plt.legend()
-# plt.show()
+    baseline_out = b_model(test_features)
+    baseline_out = baseline_out.detach().numpy()
 
-# baseline_out[baseline_out>0.5] = 1
-# baseline_out[baseline_out<=0.5] = 0
-baseline_out = np.where(baseline_out > threshold, 1, 0)
-# tn, fp, fn, tp = confusion_matrix(test_target.to_numpy(), baseline_out.reshape(-1)).ravel()
-cm = confusion_matrix(test_target.reshape(-1), baseline_out.reshape(-1))
-disp = ConfusionMatrixDisplay(confusion_matrix=cm)
-disp.plot()
-plt.show()
+    # fpr, tpr, thresholds = roc_curve(test_target.reshape(-1), baseline_out.reshape(-1))
+
+    # gmeans = np.sqrt(tpr * (1-fpr))
+    # ix = np.argmax(gmeans)
+    # print('Best Threshold=%f, G-Mean=%.3f' % (thresholds[ix], gmeans[ix]))
+
+    # plt.plot([0,1], [0,1], linestyle='--', label='No Skill')
+    # plt.plot(fpr, tpr, marker='.', label='Logistic')
+    # plt.xlabel('False Positive Rate')
+    # plt.ylabel('True Positive Rate')
+    # plt.legend()
+    # plt.show()
+
+    # baseline_out[baseline_out>0.5] = 1
+    # baseline_out[baseline_out<=0.5] = 0
+    baseline_out = np.where(baseline_out > threshold, 1, 0)
+    # tn, fp, fn, tp = confusion_matrix(test_target.to_numpy(), baseline_out.reshape(-1)).ravel()
+    cm = confusion_matrix(test_target.reshape(-1), baseline_out.reshape(-1))
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+    disp.plot()
+    plt.savefig(f"images/{K}und1")
+
+    metric = f1_score(test_target.reshape(-1), baseline_out.reshape(-1), average='weighted')
+    F1.append(metric)
 
 
-print("TRAIN:", len(train_target))
-print("TEST:", len(test_target))
-print("TRAIN 2")
+    print("TRAIN:", len(train_target))
+    print("TEST:", len(test_target))
+    print("TRAIN 2")
 
-batch_size = 50
-# num_epochs = 2000
-num_epochs = 250
-min_loss, t = np.inf, 0
-val = np.min([batch_size, len(feature)])
-lmd = 1/(val ** 2)
-threshold = None
-graph = Graph(train_features, train_target, 30)
-# L = graph.kernel.A - graph.kernel._K
-# loss = np.dot(train_features.T, L)
-# loss = np.dot(loss, train_features) 
-# lmd = 0.01
-for epoch in range(num_epochs):
-    permutation = torch.randperm(train_features.size()[0])
-    loss_list = []
-    lap_list = []
-    for i in range(0, len(train_target), batch_size):
-        indices = permutation[i:i+batch_size]
-        # print(indices)
-        batch_x, target_y = train_features[indices], train_target[indices]
-        target_y = target_y.to(torch.float64)
-        x_optimizer.zero_grad()
-        output = x_model(batch_x)
+    batch_size = 50
+    # num_epochs = 2000
+    num_epochs = 100
+    min_loss, t = np.inf, 0
+    val = np.min([batch_size, len(feature)])
+    lmd = 1/(val ** 2)
+    threshold = None
+    graph = Graph(train_features, train_target, 20)
+    # L = graph.kernel.A - graph.kernel._K
+    # loss = np.dot(train_features.T, L)
+    # loss = np.dot(loss, train_features) 
+    # lmd = 0.01
+    for epoch in range(num_epochs):
+        permutation = torch.randperm(train_features.size()[0])
+        loss_list = []
+        lap_list = []
+        for i in range(0, len(train_target), batch_size):
+            indices = permutation[i:i+batch_size]
+            # print(indices)
+            batch_x, target_y = train_features[indices], train_target[indices]
+            target_y = target_y.to(torch.float64)
+            x_optimizer.zero_grad()
+            output = x_model(batch_x)
 
-        add_loss = find_graph_loss(graph, output.detach().numpy(), indices)
-        # add_loss = find_manifold_loss(batch_x.numpy(), output.detach().numpy())
-        loss = criterion(output, target_y.reshape_as(output))
+            add_loss = find_graph_loss(graph, output.detach().numpy(), indices)
+            # add_loss = find_manifold_loss(batch_x.numpy(), output.detach().numpy())
+            loss = criterion(output, target_y.reshape_as(output))
 
-        fpr, tpr, thresholds = roc_curve(target_y.reshape(-1), output.detach().numpy().reshape(-1))
-        gmeans = np.sqrt(tpr * (1-fpr))
-        ix = np.argmax(gmeans)
-        if not threshold:
-            threshold = thresholds[ix]
-        else:
-            threshold = np.mean([thresholds[ix], threshold])
-        # loss = torch.mean(torch.abs(target_y-output))
-        # print(lmd * add_loss)
-        # print(loss, lmd*add_loss[0])
-        loss += lmd * torch.tensor(add_loss[0, 0])
-        
-        # print(type(loss))
-        loss.backward()
-        x_optimizer.step()
-        # print(loss.item())
-        loss_list.append(loss.item())
-    # print(loss_list)
-    loss_mean = np.mean(loss_list)
+            fpr, tpr, thresholds = roc_curve(target_y.reshape(-1), output.detach().numpy().reshape(-1))
+            gmeans = np.sqrt(tpr * (1-fpr))
+            ix = np.argmax(gmeans)
+            if not threshold:
+                threshold = thresholds[ix]
+            else:
+                threshold = np.mean([thresholds[ix], threshold])
+            # loss = torch.mean(torch.abs(target_y-output))
+            # print(lmd * add_loss)
+            # print(loss, lmd*add_loss[0])
+            loss += lmd * torch.tensor(add_loss[0, 0])
+            
+            # print(type(loss))
+            loss.backward()
+            x_optimizer.step()
+            # print(loss.item())
+            loss_list.append(loss.item())
+        # print(loss_list)
+        loss_mean = np.mean(loss_list)
 
-    t += 1
-    print('Surface training t={}, loss={}'.format(t, loss_mean))
+        t += 1
+        print('Surface training t={}, loss={}'.format(t, loss_mean))
 
-x_model.eval()
-# nn_out_s = x_model(train_features)
-# nn_out = nn_out_s.detach().numpy()
+    x_model.eval()
+    # nn_out_s = x_model(train_features)
+    # nn_out = nn_out_s.detach().numpy()
 
-# fpr, tpr, thresholds = roc_curve(train_target.reshape(-1), nn_out.reshape(-1))
+    # fpr, tpr, thresholds = roc_curve(train_target.reshape(-1), nn_out.reshape(-1))
 
-# gmeans = np.sqrt(tpr * (1-fpr))
-# ix = np.argmax(gmeans)
-# threshold = thresholds[ix]
-# print('Best Threshold=%f, G-Mean=%.3f' % (thresholds[ix], gmeans[ix]))
+    # gmeans = np.sqrt(tpr * (1-fpr))
+    # ix = np.argmax(gmeans)
+    # threshold = thresholds[ix]
+    # print('Best Threshold=%f, G-Mean=%.3f' % (thresholds[ix], gmeans[ix]))
 
-# plt.plot([0,1], [0,1], linestyle='--', label='No Skill')
-# plt.plot(fpr, tpr, marker='.', label='Logistic')
-# plt.xlabel('False Positive Rate') 
-# plt.ylabel('True Positive Rate')
-# plt.legend()
-# plt.show()
+    # plt.plot([0,1], [0,1], linestyle='--', label='No Skill')
+    # plt.plot(fpr, tpr, marker='.', label='Logistic')
+    # plt.xlabel('False Positive Rate') 
+    # plt.ylabel('True Positive Rate')
+    # plt.legend()
+    # plt.show()
 
-# nn_out[nn_out>0.5] = 1
-# nn_out[nn_out<=0.5] = 0
+    # nn_out[nn_out>0.5] = 1
+    # nn_out[nn_out<=0.5] = 0
 
-nn_out_s = x_model(test_features)
-nn_out = nn_out_s.detach().numpy()
-# nn_out[nn_out>0.5] = 1
-# nn_out[nn_out<=0.5] = 0
-nn_out = np.where(nn_out > threshold, 1, 0)
+    nn_out_s = x_model(test_features)
+    nn_out = nn_out_s.detach().numpy()
+    # nn_out[nn_out>0.5] = 1
+    # nn_out[nn_out<=0.5] = 0
+    nn_out = np.where(nn_out > threshold, 1, 0)
 
-cm = confusion_matrix(test_target.reshape(-1), nn_out.reshape(-1))
-disp = ConfusionMatrixDisplay(confusion_matrix=cm)
-disp.plot()
-plt.show()
+    cm = confusion_matrix(test_target.reshape(-1), nn_out.reshape(-1))
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+    disp.plot()
+    plt.savefig(f"images/{K}und2")
+    metric = f1_score(test_target.reshape(-1), nn_out.reshape(-1), average='weighted')
+    F2.append(metric)
+
+with open("result.txt", "w") as fl:
+    fl.write(str(F1))
+    fl.write(str(F2))
+    fl.close()

@@ -10,6 +10,8 @@ import networkx as nx
 import plotly.graph_objects as go
 from sklearn.metrics.pairwise import euclidean_distances
 from sklearn.decomposition import PCA
+from progress.bar import Bar
+import scipy as sp
 # from line_profiler import profile
 
 # import lib
@@ -85,6 +87,18 @@ def checking_1(node_param, neighbour_params, neighbours):
     return True
 
 @njit
+def tets(eds, A, i):
+    indx_neighbours = np.argsort(eds[i])
+    indx_neighbours = indx_neighbours[np.argwhere(indx_neighbours != i)[:, 0]]
+    node_neigh = np.argwhere(A[i] == 1)
+    if indx_neighbours[0] not in node_neigh:
+        node_neigh = np.append(node_neigh, indx_neighbours[0])
+    # indx_neighbours = indx_neighbours[np.argwhere(indx_neighbours != np.intersect1d(indx_neighbours, node_neigh))[:, 0]]
+    indx_neighbours = np.array([val for val in indx_neighbours if val not in node_neigh])
+
+    return indx_neighbours, node_neigh
+
+@njit
 def create_matrix(half_matr, n, eps):
     result_matrix = np.zeros((n, n))
     k = 0
@@ -114,10 +128,15 @@ class Graph(nx.Graph):
                 color = colors[i]                
             self.add_nodes_from([(i, {"name": i, "params": elem, "color": color, "select": False})])
         
-        self._source_data = data
+        self._source_data = sp.sparse.coo_array(data)
 
-        self.matrix_connect = np.zeros((self.number_of_nodes(), self.number_of_nodes()))
+        self.matrix_connect = sp.sparse.coo_array(np.zeros((self.number_of_nodes(), self.number_of_nodes())))
+        self.A = sp.sparse.coo_array(np.zeros((self.number_of_nodes(), self.number_of_nodes())))
+        self._K = sp.sparse.coo_array(np.zeros((self.number_of_nodes(), self.number_of_nodes())))
+        print("Start searching ED")
         self.find_ED(0.4)
+        # self.find_ED_new(0.4)
+        print("finidshed")
         # self.find_ED_other_realisation(0.7)
         self.drawing = Draw(self)
 
@@ -135,6 +154,8 @@ class Graph(nx.Graph):
         self.matrix_connect = eds
 
         maxval = np.max(eds)
+        bar = Bar('Search Edges', max=N)
+        bar.start()
         for i in range(N):
             indx_neighbours = np.argsort(eds[i])
             indx_neighbours = np.delete(indx_neighbours, np.where(indx_neighbours == i))
@@ -151,6 +172,70 @@ class Graph(nx.Graph):
                         continue
                     self.add_edge(i, j, weight=eds[i][j])
                     node_neigh.append(j)
+                    self.A[i][j] = 1
+                    self.A[j][i] = 1
+                    self._K[i][j] = eds[i][j]/maxval
+                    self._K[j][i] = eds[i][j]/maxval
+            bar.next()
+        bar.finish()
+
+    def find_ED_new(self, eps):
+        N = self.number_of_nodes()
+        eds = euclidean_distances(self._source_data, self._source_data)
+        self.matrix_connect = eds
+
+        # tets(eds, eps, self._source_data)
+        N = len(eds[0])
+        maxval = np.max(eds)
+        self.A = np.zeros((N, N))
+        self._K = np.zeros((N, N))
+        bar = Bar('Search Edges', max=N)
+        bar.start()
+        for i in range(N):
+            indx_neighbours, node_neigh = tets(eds, self.A, i)
+            for j in indx_neighbours:
+                if eds[i][j]/maxval <= eps:
+                    neighbours = self._source_data[i] - self._source_data[node_neigh]
+                    check = self._source_data[j] - self._source_data[node_neigh]
+                    result = np.diag(np.dot(neighbours, check.T))
+                    if len(result[result < 0]) > 0:
+                        continue
+                    self.add_edge(i, j, weight=eds[i][j])
+                    node_neigh = np.append(node_neigh, j)
+                    self.A[i][j] = 1
+                    self.A[j][i] = 1
+                    self._K[i][j] = eds[i][j]/maxval
+                    self._K[j][i] = eds[i][j]/maxval
+            bar.next()
+        bar.finish()
+
+            
+
+        # maxval = np.max(eds)
+        # bar = Bar('Search Edges', max=N)
+        # bar.start()
+        # for i in range(N):
+        #     indx_neighbours = np.argsort(eds[i])
+        #     indx_neighbours = np.delete(indx_neighbours, np.where(indx_neighbours == i))
+        #     node_neigh = [elem[0] for elem in self[i].items()]
+        #     if indx_neighbours[0] not in node_neigh:
+        #         node_neigh.append(indx_neighbours[0])
+        #     indx_neighbours  = np.delete(indx_neighbours, np.where(np.intersect1d(indx_neighbours, node_neigh)))
+        #     for j in indx_neighbours:
+        #         if eds[i][j]/maxval <= eps:
+        #             neighbours = self._source_data[i] - self._source_data[node_neigh]
+        #             check = self._source_data[j] - self._source_data[node_neigh]
+        #             result = np.diag(np.dot(neighbours, check.T))
+        #             if len(result[result < 0]) > 0:
+        #                 continue
+        #             self.add_edge(i, j, weight=eds[i][j])
+        #             node_neigh.append(j)
+        #             self.A[i][j] = 1
+        #             self.A[j][i] = 1
+        #             self._K[i][j] = eds[i][j]/maxval
+        #             self._K[j][i] = eds[i][j]/maxval
+        #     bar.start()
+        # bar.finish()
 
     
     def find_ED_other_realisation(self, eps):
