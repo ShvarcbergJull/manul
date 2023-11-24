@@ -62,7 +62,7 @@ def find_graph_loss(graph, f_x, indexs):
     part_1 = np.dot(f_x.T, laplassian)
     loss = np.dot(part_1, f_x)
 
-    return loss
+    return loss.reshape(-1)[0]
 
 def baseline(dim):
     baseline_model = nn.Sequential(
@@ -88,27 +88,27 @@ def baseline(dim):
 # ------------------
 
 # real_data
-'''
-raw_data = loadarff("data/electricity-normalized.arff")
-df_data = pd.DataFrame(raw_data[0])
-df_data['day'] = df_data['day'].astype('int32')
-up_data = df_data[df_data['class']==b'UP'][:2500]
-down_data = df_data[df_data['class']==b'DOWN'][:2500]
 
-work_data = up_data[:2000]
-work_data = work_data.append(down_data[:2000])
-work_data = work_data.append(up_data[2000:])
-work_data = work_data.append(down_data[2000:])
+# raw_data = loadarff("data/electricity-normalized.arff")
+# df_data = pd.DataFrame(raw_data[0])
+# df_data['day'] = df_data['day'].astype('int32')
+# up_data = df_data[df_data['class']==b'UP'][:2500]
+# down_data = df_data[df_data['class']==b'DOWN'][:2500]
 
-# work_data = df_data[:5000]
-# work_data = df_data
+# work_data = up_data[:2000]
+# work_data = work_data.append(down_data[:2000])
+# work_data = work_data.append(up_data[2000:])
+# work_data = work_data.append(down_data[2000:])
 
-target = work_data['class'].to_numpy()
-target[target==b'UP'] = 1
-target[target==b'DOWN'] = 0
-target = target.astype(dtype=int)
-feature = work_data[['date', 'day', 'period', 'nswprice', 'nswdemand', 'vicprice', 'vicdemand', 'transfer']]
-'''
+# # work_data = df_data[:5000]
+# # work_data = df_data
+
+# target = work_data['class'].to_numpy()
+# target[target==b'UP'] = 1
+# target[target==b'DOWN'] = 0
+# target = target.astype(dtype=int)
+# feature = work_data[['date', 'day', 'period', 'nswprice', 'nswdemand', 'vicprice', 'vicdemand', 'transfer']]
+
 
 with open("result.txt", "w") as fl:
     fl.write("test")
@@ -217,42 +217,18 @@ for K in range(10):
         print('Surface training t={}, loss={}'.format(t, loss_mean))
 
     b_model.eval()
-    # baseline_out = b_model(train_features)
-    # baseline_out = baseline_out.detach().numpy()
-
-    # fpr, tpr, thresholds = roc_curve(train_target.reshape(-1), baseline_out.reshape(-1))
-
-    # gmeans = np.sqrt(tpr * (1-fpr))
-    # ix = np.argmax(gmeans)
-    # threshold = thresholds[ix]
 
     baseline_out = b_model(test_features)
     baseline_out = baseline_out.detach().numpy()
-
-    # fpr, tpr, thresholds = roc_curve(test_target.reshape(-1), baseline_out.reshape(-1))
-
-    # gmeans = np.sqrt(tpr * (1-fpr))
-    # ix = np.argmax(gmeans)
-    # print('Best Threshold=%f, G-Mean=%.3f' % (thresholds[ix], gmeans[ix]))
-
-    # plt.plot([0,1], [0,1], linestyle='--', label='No Skill')
-    # plt.plot(fpr, tpr, marker='.', label='Logistic')
-    # plt.xlabel('False Positive Rate')
-    # plt.ylabel('True Positive Rate')
-    # plt.legend()
-    # plt.show()
-
-    # baseline_out[baseline_out>0.5] = 1
-    # baseline_out[baseline_out<=0.5] = 0
     baseline_out = np.where(baseline_out > threshold, 1, 0)
-    # tn, fp, fn, tp = confusion_matrix(test_target.to_numpy(), baseline_out.reshape(-1)).ravel()
     cm = confusion_matrix(test_target.reshape(-1), baseline_out.reshape(-1))
     disp = ConfusionMatrixDisplay(confusion_matrix=cm)
     disp.plot()
     plt.savefig(f"images/{K}und1")
 
-    metric = f1_score(test_target.reshape(-1), baseline_out.reshape(-1), average='weighted')
-    F1.append(metric)
+    metric = f1_score(test_target.reshape(-1), baseline_out.reshape(-1), average=None)
+    print(baseline_out.shape)
+    F1.append(list(metric))
 
 
     print("TRAIN:", len(train_target))
@@ -266,7 +242,7 @@ for K in range(10):
     val = np.min([batch_size, len(feature)])
     lmd = 1/(val ** 2)
     threshold = None
-    graph = Graph(train_features, train_target, 20)
+    graph = Graph(train_features.numpy(), train_target.numpy(), 20)
     # L = graph.kernel.A - graph.kernel._K
     # loss = np.dot(train_features.T, L)
     # loss = np.dot(loss, train_features) 
@@ -341,10 +317,11 @@ for K in range(10):
     disp = ConfusionMatrixDisplay(confusion_matrix=cm)
     disp.plot()
     plt.savefig(f"images/{K}und2")
-    metric = f1_score(test_target.reshape(-1), nn_out.reshape(-1), average='weighted')
+    metric = f1_score(test_target.reshape(-1), nn_out.reshape(-1), average=None)
     F2.append(metric)
 
-with open("result.txt", "w") as fl:
+with open("result_2.txt", "w") as fl:
     fl.write(str(F1))
+    fl.write("\n")
     fl.write(str(F2))
     fl.close()
