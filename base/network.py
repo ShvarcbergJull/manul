@@ -7,6 +7,7 @@ import networkx as nx
 import topo as tp
 import plotly.graph_objects as go
 from sklearn.decomposition import PCA
+from sklearn.metrics.pairwise import euclidean_distances
 # from line_profiler import profile
 
 # import lib
@@ -64,15 +65,45 @@ class Graph(nx.Graph):
             self.add_nodes_from([(i, {"name": i, "params": elem, "color": color, "select": False})])
         
         self._source_data = data
+        self._mymatrix = None
 
         self.matrix_connect = np.zeros((self.number_of_nodes(), self.number_of_nodes()))
-        self.kernel = tp.tpgraph.Kernel(n_neighbors=n_neighbors, n_jobs=1, metric='cosine', backend="hnswlib", verbose=True)
+        self.AM = np.zeros((self.number_of_nodes(), self.number_of_nodes()))
+        self.KM = np.zeros((self.number_of_nodes(), self.number_of_nodes()))
+        self.kernel = tp.tpgraph.Kernel(n_neighbors=n_neighbors, n_jobs=1, metric='cosine', fuzzy=True, verbose=True)
         self.kernel.fit(data)
+        self.my_laplassian = np.zeros((data.shape[0], data.shape[0]))
 
         self.connected = self.kernel.A.todense()
-        # self.find_ED(0.4)
-        self.find_graph(0.5)
+        # self.find_ED_new(0.15)
+        self.find_graph(0.15)
         self.drawing = Draw(self)
+
+    @property
+    def mymatrix(self):
+        return self._mymatrix
+    
+    @mymatrix.setter
+    def mymatrix(self, new_matrix):
+        for i in range(len(new_matrix)):
+            for j in range(i+1, len(new_matrix)):
+                if new_matrix[i][j] == 0 and self._mymatrix[i][j] != 0:
+                    self.remove_edge(i, j)
+
+        self._mymatrix = new_matrix
+
+    def local_remove_edges(self, edges_list):
+        self.remove_edges_from(edges_list)
+        for edge in edges_list:
+            self.my_laplassian[edge[0]][edge[1]] = self.kernel.L[edge[0], edge[1]]
+            self.my_laplassian[edge[1]][edge[0]] = self.kernel.L[edge[1], edge[0]]
+    
+    def set_laplassian(self, edges_list):
+        for i, edge in enumerate(edges_list):
+            for elem in edge:
+                self.add_edge(int(self.nodes[i]["name"]), int(self.nodes[edge[elem]]["name"]), weight=elem)
+                self.my_laplassian[i][edge[elem]] = self.kernel.L[i, edge[elem]]
+                self.my_laplassian[edge[elem]][i] = self.kernel.L[edge[elem], i]
 
     @staticmethod
     def _fitness_wrapper(params, *args):
@@ -103,16 +134,35 @@ class Graph(nx.Graph):
             self.matrix_connect[edge[1]["name"]][edge[0]["name"]] = edge[2]
             if edge[2]/maxval <= eps:
                 self.add_edge(int(edge[0]["name"]), int(edge[1]["name"]), weight=edge[2])
+                self.AM[int(edge[0]["name"]), int(edge[1]["name"])] = 1
+                self.KM[int(edge[0]["name"]), int(edge[1]["name"])] = edge[2]
+
+    def find_ED_new(self, eps):
+        eds = euclidean_distances(self._source_data, self._source_data)
+        maxval = np.max(eds)
+        self.matrix_connect = eds
+
+        for i in range(len(eds)):
+            for j in range(i+1, len(eds)):
+                if eds[i][j] / maxval <= eps:
+                    # self.add_edge(i, j, weight=eds[i][j])
+                    pass
+                    # self.AM[i, j] = 1
+                    # self.KM[j, i] = eds[i][j]
+
 
     def find_graph(self, eps):
         max_value = np.max(self.kernel.SP)
         N = self.number_of_nodes()
+        eds = euclidean_distances(self._source_data, self._source_data)
+        self._mymatrix = eds
 
         for i in range(N):
             for j in range(i+1, N):
                 # if self.kernel.SP[i][j]  / max_value <= eps:
                 if self.connected[i, j] == 1 and self.nodes[i]["name"] != self.nodes[j]["name"]:
-                    self.add_edge(int(self.nodes[i]["name"]), int(self.nodes[j]["name"]), weight=self.kernel.SP[i][j])
+                    self.add_edge(int(self.nodes[i]["name"]), int(self.nodes[j]["name"]), weight=eds[i][j])
+                    # pass
 
     def search_nodes(self, n, choose_node):
         if n == 1:
@@ -170,11 +220,52 @@ class Graph(nx.Graph):
                     self.remove_edge(current_node["name"], check_this["name"])
                 else:
                     start_nodes.append(check_this)
-            # new_neighbours_indexs = sorted(self[current_node["name"]].items(), key=lambda edge: edge[1]["weight"])
-            # new_neighbours_indexs = filter(lambda index: not self.nodes[index[0]]["select"], new_neighbours_indexs)
-            # start_nodes.extend([self.nodes[x[0]] for x in new_neighbours_indexs])
 
     def check_visible_neigh_gh(self, start_nodes):
+        while len(start_nodes) > 0:
+            current_node = start_nodes.pop(0)
+            current_node["select"] = True
+            if len(list(self.neighbors(current_node["name"]))) == 0:
+                continue
+            neighbours_indexes = sorted(self.edges(current_node["name"], data=True), key=lambda edge: edge[2]["weight"])
+            neighbours_indexes = np.array(list(zip(*neighbours_indexes))[0])
+            add_params = np.array([self.nodes[node]["params"] for node in neighbours_indexes])
+            neighbours = np.array(current_node["params"]) - add_params
+
+            for i, elem in enumerate(neighbours_indexes):
+                check_this = self.nodes[elem]
+                neigh_2 = np.array(check_this["params"]) - add_params
+                result = np.diag(np.dot(neighbours, neigh_2.T))
+                if len(result[result < 0]) > 0:
+                    self.remove_edge(current_node["name"], check_this["name"])
+                else:
+                    if not check_this["select"]:
+                        start_nodes.append(check_this)
+
+    def check_visible_neigh_broke(self, start_nodes):
+        while len(start_nodes) > 0:
+            current_node = start_nodes.pop(0)
+            current_node["select"] = True
+            if len(list(self.neighbors(current_node["name"]))) == 0:
+                continue
+            neighbours_indexes = sorted(self.edges(current_node["name"], data=True), key=lambda edge: edge[2]["weight"])
+            neighbours_indexes = np.array(list(zip(*neighbours_indexes))[0])
+            add_params = np.array([self.nodes[node]["params"] for node in neighbours_indexes])
+            neighbours = np.array(current_node["params"]) - add_params
+
+            for i, elem in enumerate(neighbours_indexes):
+                check_this = self.nodes[elem]
+                if check_this["select"]:
+                    continue
+                result = checking(check_this["params"], add_params, neighbours)
+                if not result:
+                    self.remove_edge(current_node["name"], check_this["name"])
+                    # self.AM[current_node["name"], check_this["name"]] = 0
+                    # self.KM[current_node["name"], check_this["name"]] = 0
+                else:
+                    start_nodes.append(check_this)
+    
+    def check_visible_neigh(self, start_nodes):
         while len(start_nodes) > 0:
             current_node = start_nodes.pop(0)
             current_node["select"] = True
@@ -191,30 +282,13 @@ class Graph(nx.Graph):
                 result = np.diag(np.dot(neighbours, neigh_2.T))
                 if len(result[result < 0]) > 0:
                     self.remove_edge(current_node["name"], check_this["name"])
+                    # self.A[current_node["name"]][check_this["name"]] = 0
+                    # self.K[current_node["name"]][check_this["name"]] = 0
+                    self.kernel.L[current_node["name"], check_this["name"]] = 0
+                    self.kernel.L[check_this["name"], current_node["name"]] = 0
                 else:
                     if not check_this["select"]:
                         start_nodes.append(check_this)
-
-    def check_visible_neigh(self, start_nodes):
-        while len(start_nodes) > 0:
-            current_node = start_nodes.pop(0)
-            current_node["select"] = True
-            if len(list(self.neighbors(current_node["name"]))) == 0:
-                continue
-            neighbours_indexes = sorted(self[current_node["name"]].items(), key=lambda edge: edge[1]["weight"])
-            neighbours_indexes = np.array(list(zip(*neighbours_indexes))[0])
-            add_params = np.array([self.nodes[node]["params"] for node in neighbours_indexes])
-            neighbours = np.array(current_node["params"]) - add_params
-
-            for i, elem in enumerate(neighbours_indexes):
-                check_this = self.nodes[elem]
-                if check_this["select"]:
-                    continue
-                result = checking(check_this["params"], add_params, neighbours)
-                if not result:
-                    self.remove_edge(current_node["name"], check_this["name"])
-                else:
-                    start_nodes.append(check_this)
 
     def check_visible_neigh_with_ts(self, start_nodes):
         pca = PCA(n_components=2)

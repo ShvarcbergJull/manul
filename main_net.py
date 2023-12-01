@@ -10,17 +10,20 @@ import matplotlib.cm as cm
 import matplotlib.colors as colors_tool
 from mpl_toolkits.mplot3d import proj3d
 from numba import njit
+from numba.typed import Dict
 
 import networkx as nx
 import time
+import scipy as sp
 
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from sklearn.metrics import roc_curve
 from sklearn.decomposition import PCA
 from sklearn.datasets import make_swiss_roll
 
-# from base.network import Graph # , Edge
-from base.structure import Graph
+# from network2 import Graph # , Edge
+# from base.structure import Graph
+from base.network import Graph
 import base.methods as mth
 
 def baseline(dim):
@@ -38,6 +41,45 @@ def baseline(dim):
     )
 
     return baseline_model
+
+@njit
+def chekkk(source_data, res, start_indexs):
+    selects = np.zeros((source_data.shape[0]))
+    rem_edges = []
+    while len(start_indexs) > 0:
+        current_index = start_indexs.pop(0)
+        selects[current_index] = 1
+        if len(res[current_index]) == 0:
+            continue
+        kss = list(res[current_index].keys())[::-1]
+        neigh_indxs = np.array([res[current_index][i] for i in kss])
+        add_params = source_data[neigh_indxs]
+        neighbours = source_data[current_index] - add_params
+
+        for i, elem in enumerate(neigh_indxs):
+            if selects[elem] == 1:
+                continue
+            check_this = source_data[elem]
+            neigh_2 = check_this - add_params
+            result = np.diag(np.dot(neighbours, neigh_2.T))
+            if len(result[result < 0]) > 0:
+                del res[current_index][kss[i]]
+                rem_edges.append((current_index, elem))
+            else:
+                start_indexs.append(elem)
+    
+    return res, rem_edges
+
+def forming_dict(graph):
+    # res = {}
+    res = []
+    for i in range(graph.number_of_nodes()):
+        res.append(Dict())
+        # res[i] = {}
+        for k in graph[i]:
+            res[i][graph[i][k]["weight"]] = k
+
+    return res
 
 if __name__ == "__main__":
     # рисование сферы
@@ -166,9 +208,10 @@ if __name__ == "__main__":
     data, avg_of_data, var_of_data = mth.prebording_data(data)
 
     time_start = time.time()
-    graph = Graph(data=data, colors=colors)
+    graph = Graph(data=data, colors=colors, n_neighbors=10)
     graph.var = var_of_data
     graph.avg = avg_of_data
+    sctdf = forming_dict(graph)
     print("--- %s seconds ---" % (time.time() - time_start))
 
     print(graph)
@@ -209,13 +252,15 @@ if __name__ == "__main__":
             choose_node = node
     
     # time_start = time.time()
-    # graph.check_visible_neigh([choose_node])
-    # # graph.check_visible_neigh_with_ts([choose_node])
+    res, edges = chekkk(data, sctdf, [choose_node["name"]])
+    graph.remove_edges_from(edges)
+    # graph.check_visible_neigh_gh([choose_node])
+    # graph.check_visible_neigh_with_ts([choose_node])
     # print("--- %s seconds ---" % (time.time() - time_start))
     
     # # graph.draw()
     # print(len(graph.edges))
-    # graph.drawing.draw_graph()
+    graph.drawing.draw_graph()
 
     # choosen_node = None
     # for node in graph.nodes:

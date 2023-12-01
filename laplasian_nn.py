@@ -12,6 +12,7 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, f1_score
 from sklearn.metrics import roc_curve
 
 from base.network import Graph
+import fastnet
 
 
 warnings.filterwarnings("ignore")
@@ -80,6 +81,16 @@ def baseline(dim):
 
     return baseline_model
 
+def get_index_max(matr):
+    res_index = 0
+    count_elems = 0
+    for i, row in enumerate(matr):
+        current_count = np.count_nonzero(row)
+        if count_elems < current_count:
+            count_elems = current_count
+            res_index = i
+    
+    return res_index
 
 # simple data
 # data = load_breast_cancer(return_X_y=True, as_frame=True)
@@ -146,7 +157,15 @@ test_features = grid_flattened[param:]
 test_target = torch.tensor(target)[param:]
 
 
+graph_two = Graph(train_features.numpy(), train_target.numpy())
+choose_node = None
+for node in graph_two.nodes.values():
+    if not choose_node:
+        choose_node = node
+    elif len(list(graph_two.neighbors(node["name"]))) > len(list(graph_two.neighbors(choose_node["name"]))):
+        choose_node = node
 
+graph_two.check_visible_neigh([choose_node])
 
 
 # train_target = torch.tensor(train_target)

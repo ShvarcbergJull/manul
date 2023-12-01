@@ -4,7 +4,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # filename = "swiss_res.txt"
-filename = "experiment1_result.txt"
+# filename = "experiment1_result9.txt"
+# filename = "huhuhf_2.txt"
+filename = "result_exp1.txt"
 
 with open(filename, "r") as fl:
     tet = fl.read()
