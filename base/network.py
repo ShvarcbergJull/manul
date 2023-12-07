@@ -75,8 +75,8 @@ class Graph(nx.Graph):
         self.my_laplassian = np.zeros((data.shape[0], data.shape[0]))
 
         self.connected = self.kernel.A.todense()
-        # self.find_ED_new(0.15)
-        self.find_graph(0.15)
+        self.find_ED_new(0.15)
+        # self.find_graph(0.15)
         self.drawing = Draw(self)
 
     @property
@@ -94,16 +94,18 @@ class Graph(nx.Graph):
 
     def local_remove_edges(self, edges_list):
         self.remove_edges_from(edges_list)
+        maxval = np.max(self.matrix_connect)
         for edge in edges_list:
-            self.my_laplassian[edge[0]][edge[1]] = self.kernel.L[edge[0], edge[1]]
-            self.my_laplassian[edge[1]][edge[0]] = self.kernel.L[edge[1], edge[0]]
+            self.my_laplassian[edge[0]][edge[1]] = 1 - self.matrix_connect[edge[0]][edge[1]] / maxval
+            self.my_laplassian[edge[1]][edge[0]] = 1 - self.matrix_connect[edge[1]][edge[0]] / maxval
     
     def set_laplassian(self, edges_list):
+        maxval = np.max(self.matrix_connect)
         for i, edge in enumerate(edges_list):
             for elem in edge:
                 self.add_edge(int(self.nodes[i]["name"]), int(self.nodes[edge[elem]]["name"]), weight=elem)
-                self.my_laplassian[i][edge[elem]] = self.kernel.L[i, edge[elem]]
-                self.my_laplassian[edge[elem]][i] = self.kernel.L[edge[elem], i]
+                self.my_laplassian[i][edge[elem]] = 1 - self.matrix_connect[i][edge[elem]] / maxval
+                self.my_laplassian[edge[elem]][i] = 1 - self.matrix_connect[edge[elem]][i] / maxval
 
     @staticmethod
     def _fitness_wrapper(params, *args):

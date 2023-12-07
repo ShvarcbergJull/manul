@@ -21,6 +21,12 @@ def prebording_data(data):
     
     return data, avg, var
 
+def test_function(graph, f_x):
+    part1 = np.dot(f_x, graph.my_laplassian)
+    result = np.dot(part1, f_x.T)
+
+    return result
+
 def take_nn(train_features, train_target, dims, num_epochs, batch_size, model_settings=None, add_loss_func=None, graph=None, val=1):
     def baseline(dim):
         baseline_model = nn.Sequential(
@@ -30,9 +36,9 @@ def take_nn(train_features, train_target, dims, num_epochs, batch_size, model_se
             nn.ReLU(),
             nn.Linear(256, 256, dtype=torch.float64),
             nn.ReLU(),
-            nn.Linear(256, 512, dtype=torch.float64),
+            nn.Linear(256, 64, dtype=torch.float64),
             nn.ReLU(),
-            nn.Linear(512, 1, dtype=torch.float64),
+            nn.Linear(64, 1, dtype=torch.float64),
             nn.Sigmoid()
             # nn.LogSoftmax(dim=1)
         )
@@ -53,11 +59,14 @@ def take_nn(train_features, train_target, dims, num_epochs, batch_size, model_se
     b_model.train()
     min_loss, t = np.inf, 0
     threshold = None
-    lmd = 1/(val ** 2)
+    lmd = 1/((batch_size - 100) ** 2)
     epoch = 0
     end = False
     last_loss = None
     count_loss = 0
+    # adding_loss = None
+    # if add_loss_func:
+    #     adding_loss = test_function(graph, train_features)
     while epoch < num_epochs and end == False:
         permutation = torch.randperm(train_features.size()[0])
         loss_list = []
@@ -74,6 +83,7 @@ def take_nn(train_features, train_target, dims, num_epochs, batch_size, model_se
             loss = criterion(output, target_y.reshape_as(output))
             if add_loss_func:
                 add_loss = add_loss_func(graph, output.detach().numpy(), indices)
+                # add_loss = adding_loss[indices]
                 try:
                     loss += lmd * torch.tensor(add_loss[0, 0])
                 except:
@@ -116,7 +126,7 @@ def take_nn(train_features, train_target, dims, num_epochs, batch_size, model_se
 
     b_model.eval()
 
-    return {"model": b_model, "criterion": criterion, "optimizer": optimizer}, threshold
+    return {"model": b_model, "criterion": criterion, "optimizer": optimizer}, threshold, t
 
 class Draw:
 
