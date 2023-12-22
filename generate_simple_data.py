@@ -30,6 +30,8 @@ def create_swiss_roll(N):
     y = data[0][:, 1]
     z = data[0][:, 2]
     colors = data[1].copy()
+    colors[colors<10] = 0
+    colors[colors>=10] = 1
 
     return np.array([x, y, z, colors]).T
 

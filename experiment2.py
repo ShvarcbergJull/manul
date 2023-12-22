@@ -93,7 +93,7 @@ def chekkk(source_data, res, start_indexs):
 
 
 R = 5
-n = 400
+n = 3000
 dims = 3
 
 # данные для свисролл

@@ -177,17 +177,17 @@ test_features = grid_flattened[param:]
 test_target = torch.tensor(target)[param:]
 
 graph = Graph(train_features.numpy(), train_target.numpy(), n_neighbors=17)
-# sctdf = forming_dict(graph)
-# choose_node = None
-# for node in graph.nodes.values():
-#     if not choose_node:
-#         choose_node = node
-#     elif len(list(graph.neighbors(node["name"]))) > len(list(graph.neighbors(choose_node["name"]))):
-#         choose_node = node
+sctdf = forming_dict(graph)
+choose_node = None
+for node in graph.nodes.values():
+    if not choose_node:
+        choose_node = node
+    elif len(list(graph.neighbors(node["name"]))) > len(list(graph.neighbors(choose_node["name"]))):
+        choose_node = node
 
-# # time_start = time.time()
+# time_start = time.time()
 print(f"Start checking {len(graph.edges)}")
-# res, edges = chekkk(train_features.numpy(), sctdf, [choose_node["name"]])
+res, edges = chekkk(train_features.numpy(), sctdf, [choose_node["name"]])
 # with open("exp1_edges_first.txt", "w") as fl:
 #     fl.write(str(res))
 # graph.local_remove_edges(edges)

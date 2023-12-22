@@ -11,17 +11,22 @@ from .crossovers import CrossoverPopulation
 from .mutations import MutationIndivid
 from .mutations import MutationPopulation
 
+from .fitness import VarFitnessIndivid
+from .fitness import FitnessPopulation
 
-def create_operator_map(grid, individ, kwargs):
+
+def create_operator_map(grid, individ, model, kwargs):
     mutation = kwargs['mutation']
     crossover = kwargs['crossover']
     population_size = kwargs['population']['size']
+    fitness = kwargs['fitness']
 
     operatorsMap = OperatorMap()
 
     operatorsMap.InitPopulation = InitPopulation(
         params=dict(population_size=population_size,
-                    individ=individ))
+                    individ=individ,
+                    base_model=model))
 
     operatorsMap.Elitism = Elitism(
         params=dict(elitism=1)
@@ -48,3 +53,11 @@ def create_operator_map(grid, individ, kwargs):
         params=dict(mut_intensive=mutation['simple']['intensive'],
                     increase_prob=mutation['simple']['increase_prob'])
     )
+
+    operatorsMap.VarFitnessIndivid = VarFitnessIndivid(
+        params=dict(test_feature=fitness['test_feature'],
+                    test_target=fitness['test_target'],
+                    add_loss_function=fitness['add_loss_function'])
+    )
+
+    operatorsMap.FitnessPopulation = FitnessPopulation()

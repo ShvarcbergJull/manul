@@ -13,8 +13,10 @@ from sklearn.metrics.pairwise import euclidean_distances
 from sklearn.metrics import roc_curve
 import plotly.graph_objects as go
 import torch.nn as nn
-from torch import float64, randperm, tensor
+from torch import randperm, tensor
 from torch.optim import Adam
+from torch import float64 as fl64
+from sklearn.metrics import f1_score
 
 
 @njit
@@ -75,6 +77,7 @@ class DataStructureGraph(Individ):
         self.laplassian = np.zeros((data.shape[0], data.shape[0]))
 
         self.fullness = 0 # 0-100
+        print("INFO: create laplassian")
 
         if mode:
             self.find_ED(eps)
@@ -85,13 +88,14 @@ class DataStructureGraph(Individ):
                 fl.write(str(res))
             self.local_remove(temp_edges)
         else:
-            self.laplassian = self.kernel.L.dense().numpy()
+            self.laplassian = np.array(self.kernel.L.todense())
+            self.create_edges()
 
-        self.fullness = self.calc_fullness()
+        self.calc_fullness()
         self.drawing = Draw(self.graph)
 
     def calc_fullness(self):
-        return (len(list(filter(lambda elem: elem == 0, self.laplassian.reshape(-1)))) / 2 * 100) // len(self.laplassian.reshape(-1))
+        self.fullness = (len(list(filter(lambda elem: elem == 0, self.laplassian.reshape(-1)))) / 2 * 100) // len(self.laplassian.reshape(-1))
 
 
     def copy(self):
@@ -100,6 +104,7 @@ class DataStructureGraph(Individ):
         new_object.laplassian = deepcopy(self.laplassian)
         new_object.fullness = self.fullness
         new_object.matrix_connect = deepcopy(self.matrix_connect)
+        new_object.drawing = Draw(new_object.graph)
 
         return new_object
     
@@ -116,12 +121,23 @@ class DataStructureGraph(Individ):
         # self.edges = []
 
         for i in range(len(eds)):
-            self.edges.append(Dict.empty(key_type=float64, value_type=int64))
+            # self.edges.append(Dict.empty(key_type=float64, value_type=int64))
             for j in range(i, len(eds)):
                 if eds[i][j] / maxval <= eps:
                     self.laplassian[i][j] = 1 - eds[i][j] / maxval
                     self.laplassian[j][i] = 1 - eds[i][j] / maxval
                     # self.edges[i][eds[i][j]] = j
+                    self.graph.add_edge(i, j, weight=eds[i][j])
+
+    def create_edges(self):
+        eds = euclidean_distances(self._source_data, self._source_data)
+        maxval = np.max(eds)
+        self.matrix_connect = eds
+
+        for i in range(len(eds)):
+            # self.edges.append(Dict.empty(key_type=float64, value_type=int64))
+            for j in range(i, len(eds)):
+                if self.laplassian[i][j] != 0:
                     self.graph.add_edge(i, j, weight=eds[i][j])
 
     def choosing_start_node(self):
@@ -192,11 +208,14 @@ class PopulationGraph(Population):
         self.anal = []
 
     def _evolutionary_step(self, *args):
+        self.apply_operator('FitnessPopulation')
+        self.apply_operator('Elitism')
         self.apply_operator("RouletteWheelSelection")
         self.apply_operator("CrossoverPopulation")
         self.apply_operator("MutationPopulation")
 
     def evolutionary(self, *args):
+        print("INFO: create population")
         self.apply_operator('InitPopulation')
         bar = Bar('Evolution', max=self.iterations)
         bar.start()
@@ -314,38 +333,51 @@ class TakeNN:
     def __init__(self, train_feature, train_target, dims, num_epochs, batch_size, model_settings=None):
         def baseline(dim):
             baseline_model = nn.Sequential(
-                nn.Linear(dim, 512, dtype=float64),
+                nn.Linear(dim, 512, dtype=fl64),
                 nn.ReLU(),
-                nn.Linear(512, 256, dtype=float64),
+                nn.Linear(512, 256, dtype=fl64),
                 nn.ReLU(),
-                nn.Linear(256, 256, dtype=float64),
+                nn.Linear(256, 256, dtype=fl64),
                 nn.ReLU(),
-                nn.Linear(256, 64, dtype=float64),
+                nn.Linear(256, 64, dtype=fl64),
                 nn.ReLU(),
-                nn.Linear(64, 1, dtype=float64),
+                nn.Linear(64, 1, dtype=fl64),
                 nn.Sigmoid()
                 # nn.LogSoftmax(dim=1)
             )
 
             return baseline_model
+        
+        self.model_settings = {}
 
         if model_settings:
             self.model_settings = model_settings
         else:
             self.model_settings["model"] = baseline(dims)
             self.model_settings["criterion"] = nn.BCELoss()
-            # criterion = nn.CrossEntropyLoss()
-            self.model_settings["optimizer"] = Adam(model_settings["model"].parameters(), lr=1e-4, eps=1e-4)
+            self.model_settings['optimizer'] = Adam(self.model_settings['model'].parameters(), lr=1e-4, eps=1e-4)
         
-        self.feature = train_feature
+        self.features = train_feature
         self.target = train_target
         self.num_epochs = num_epochs
         self.batch_size = batch_size
+        
+        self.threshold = None
+    
+    def copy(self):
+        new_object = self.__class__(self.features, self.target, 1, self.num_epochs, self.batch_size, model_settings=self.model_settings)
+        new_object.threshold = deepcopy(self.threshold)
+        # new_object.model_settings = deepcopy(self.model_settings)
+        # new_object.features = deepcopy(self.features)
+        # new_object.target = deepcopy(self.target)
+        # new_object.num_epochs = deepcopy(self.num_epochs)
+        # new_object.batch_size = deepcopy(self.batch_size)
+
+        return new_object 
 
     def train(self, add_loss_func=None, graph=None, val=1):
         self.model_settings["model"].train()
         min_loss, t = np.inf, 0
-        threshold = None
         lmd = 1/((self.batch_size - 100) ** 2)
         epoch = 0
         end = False
@@ -361,7 +393,7 @@ class TakeNN:
                 indices = permutation[i:i+self.batch_size]
                 # print(indices)
                 batch_x, target_y = self.features[indices], self.target[indices]
-                target_y = target_y.to(float64)
+                target_y = target_y.to(fl64)
                 self.model_settings["optimizer"].zero_grad()
                 output = self.model_settings["model"](batch_x)
                 # output[output>0.5] = 1
@@ -380,10 +412,10 @@ class TakeNN:
                 gmeans = np.sqrt(tpr * (1-fpr))
                 ix = np.argmax(gmeans)
                 # print("IX", thresholds[ix])
-                if not threshold:
-                    threshold = thresholds[ix]
+                if not self.threshold:
+                    self.threshold = thresholds[ix]
                 else:
-                    threshold = np.mean([thresholds[ix], threshold])
+                    self.threshold = np.mean([thresholds[ix], self.threshold])
                 # loss = torch.mean(torch.abs(target_y-output))
                 # loss = np.mean(np.abs(output - (target_y.reshape_as(output)).detach().numpy()))
                 
@@ -401,7 +433,7 @@ class TakeNN:
                 else:
                     if np.isclose(loss.detach().numpy(), last_loss.detach().numpy(), atol=1e-3):
                         count_loss += 1
-                        print("test")
+                        # print("test")
                     last_loss = loss
                 if count_loss >= 10:
                     end = True
@@ -409,12 +441,23 @@ class TakeNN:
                 epoch += 1
 
             t += 1
-            print('Surface training t={}, loss={}'.format(t, loss_mean), count_loss)
+            # print('Surface training t={}, loss={}'.format(t, loss_mean), count_loss)
 
         self.model_settings["model"].eval()
 
-        
+    
+    def get_current_loss(self, features, target, add_loss_func=None, graph=None):
+        # lmd = 1/((len(features)) ** 2)
+        output = self.model_settings["model"](features)
+        output = output.detach().numpy()
+        output = np.where(output > self.threshold, 1, 0)
+        loss = f1_score(target.reshape(-1), output.reshape(-1), average='weighted')
 
-
-
-
+        return loss
+        # loss = self.model_settings["criterion"](output, target.reshape_as(output))
+        # if add_loss_func:
+        #     add_loss = add_loss_func(graph, output.detach().numpy())
+        #     try:
+        #         loss += lmd * tensor(add_loss[0, 0])
+        #     except:
+        #         loss += lmd * tensor(add_loss)
