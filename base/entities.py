@@ -17,6 +17,7 @@ from torch import randperm, tensor
 from torch.optim import Adam
 from torch import float64 as fl64
 from sklearn.metrics import f1_score
+from scipy import sparse
 
 
 @njit
@@ -75,15 +76,16 @@ class DataStructureGraph(Individ):
         self.kernel = tp.tpgraph.Kernel(n_neighbors=n_neighbors, n_jobs=1, metric='cosine', fuzzy=True, verbose=True)
         self.kernel.fit(data)
         self.laplassian = np.zeros((data.shape[0], data.shape[0]))
+        self.edges = np.zeros((data.shape[0], data.shape[0]))
 
         self.fullness = 0 # 0-100
         print("INFO: create laplassian")
 
         if mode:
             self.find_ED(eps)
-            self.edges = forming_dict(self.graph)
+            temp_edges = forming_dict(self.graph)
             start_node_index = self.choosing_start_node()
-            res, temp_edges = DataStructureGraph.check_visible_neigh(self._source_data, self.edges, [start_node_index])
+            res, temp_edges = DataStructureGraph.check_visible_neigh(self._source_data, temp_edges, [start_node_index])
             with open(f"info_log\\create_{self.__class__.__name__}_{datetime.now().strftime('%Y_%m_%d-%I_%M_%S_%p')}.txt", "w") as fl:
                 fl.write(str(res))
             self.local_remove(temp_edges)
@@ -118,16 +120,14 @@ class DataStructureGraph(Individ):
         eds = euclidean_distances(self._source_data, self._source_data)
         maxval = np.max(eds)
         self.matrix_connect = eds
-        # self.edges = []
 
         for i in range(len(eds)):
-            # self.edges.append(Dict.empty(key_type=float64, value_type=int64))
             for j in range(i, len(eds)):
                 if eds[i][j] / maxval <= eps:
                     self.laplassian[i][j] = 1 - eds[i][j] / maxval
                     self.laplassian[j][i] = 1 - eds[i][j] / maxval
-                    # self.edges[i][eds[i][j]] = j
-                    self.graph.add_edge(i, j, weight=eds[i][j])
+                    # self.graph.add_edge(i, j, weight=eds[i][j])
+                    self.edges[i, j] = eds[i][j]
 
     def create_edges(self):
         eds = euclidean_distances(self._source_data, self._source_data)
@@ -153,10 +153,12 @@ class DataStructureGraph(Individ):
     
 
     def local_remove(self, edges_list):
-        self.graph.remove_edges_from(edges_list)
         for edge in edges_list:
             self.laplassian[edge[0]][edge[1]] = 0
             self.laplassian[edge[1]][edge[0]] = 0
+
+            self.edges[edge[0]][edge[1]] = 0
+            self.edges[edge[1]][edge[0]] = 0
 
     
     def replace_subgraph(self, node: int, new_edges: dict):
