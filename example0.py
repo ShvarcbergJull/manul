@@ -24,7 +24,7 @@ def handler_of_data(data: Union[str, np.ndarray]):
         if format_doc == "arff":
             from scipy.io.arff import loadarff
             raw_data = pd.DataFrame(loadarff(data)[0])
-            # raw_data['day'] = raw_data['day'].astype('int32')
+            raw_data['day'] = raw_data['day'].astype('int32')
             target_key = raw_data.keys()[-1]
             feature_keys = raw_data.keys()[:-1]
 
@@ -73,7 +73,7 @@ def main(data: Union[str, np.ndarray]):
     print(train_feature.shape)
 
     logging.info("Creating base individ...")
-    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), n_neighbors=20, mode=0)
+    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), n_neighbors=20, eps=0.3)
     base_model = TakeNN(train_feature, train_target, dims=train_feature.numpy().shape[1], num_epochs=30, batch_size=300)
     logging.info("Creating map with operators and population")
 
@@ -124,7 +124,7 @@ def main(data: Union[str, np.ndarray]):
 if __name__ == "__main__":
     # data = create_swiss_roll(3000)
     data = "data/electricity-normalized.arff"
-    data = "data/phpSSK7iA.arff"
+    # data = "data/phpSSK7iA.arff"
     main(data)
 
 

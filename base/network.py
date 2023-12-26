@@ -147,8 +147,8 @@ class Graph(nx.Graph):
         for i in range(len(eds)):
             for j in range(i+1, len(eds)):
                 if eds[i][j] / maxval <= eps:
-                    # self.add_edge(i, j, weight=eds[i][j])
-                    pass
+                    self.add_edge(i, j, weight=eds[i][j])
+                    # pass
                     # self.AM[i, j] = 1
                     # self.KM[j, i] = eds[i][j]
 

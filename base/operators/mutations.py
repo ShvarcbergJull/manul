@@ -26,7 +26,7 @@ class MutationIndivid(GeneticOperatorIndivid):
 
             else:
                 # удаление 
-                edges = np.array([[int(elem[0]), int(elem[1]), elem[2]["weight"]] for elem in list(individ.graph.edges(data=True))])
+                edges = np.array([[int(elem[0]), int(elem[1]), elem[2]["weight"]] for elem in list(individ.graph.get_edges(data=True))])
                 probability = edges[:, 2]
                 probability = probability / probability.sum()
                 edge_index = np.random.choice(np.arange(individ.number_of_edges()), size=1, p=probability.astype(np.float64))[0]

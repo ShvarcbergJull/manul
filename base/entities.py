@@ -48,16 +48,23 @@ def chekkk(source_data, res, start_indexs):
     
     return res, rem_edges
 
-def forming_dict(graph):
-    # res = {}
-    res = []
-    for i in range(graph.number_of_nodes()):
-        res.append(Dict.empty(key_type=float64, value_type=int64))
-        # res[i] = {}
-        for k in graph[i]:
-            res[i][graph[i][k]["weight"]] = k
+# def forming_dict(graph):
+#     # res = {}
+#     res = []
+#     for i in range(graph.number_of_nodes()):
+#         res.append(Dict.empty(key_type=float64, value_type=int64))
+#         # res[i] = {}
+#         for k in graph[i]:
+#             res[i][graph[i][k]["weight"]] = k
 
-    return res
+#     return res
+
+def forming_dict(graph: dict):
+    res = []
+    for i in graph.keys():
+        res.append(Dict.empty(key_type=float64, value_type=int64))
+        for k in graph[i]['neighbors']:
+            res[i][graph[i]['neighbors'][k]] = k
 
 class DataStructureGraph(Individ):
 
@@ -71,12 +78,10 @@ class DataStructureGraph(Individ):
             color = None
             if labels is not None:
                 color = labels[i]                
-            self.graph.add_nodes_from([(i, {"name": i, "params": elem, "label": color, "select": False})])
+            # self.graph.add_nodes_from([(i, {"name": i, "params": elem, "label": color, "select": False})])
+            self.graph[i] = {"name": i, "params": elem, "label": color, "select": False, "neighbors": {}}
 
-        self.kernel = tp.tpgraph.Kernel(n_neighbors=n_neighbors, n_jobs=1, metric='cosine', fuzzy=True, verbose=True)
-        self.kernel.fit(data)
         self.laplassian = np.zeros((data.shape[0], data.shape[0]))
-        self.edges = np.zeros((data.shape[0], data.shape[0]))
 
         self.fullness = 0 # 0-100
         print("INFO: create laplassian")
@@ -90,6 +95,8 @@ class DataStructureGraph(Individ):
                 fl.write(str(res))
             self.local_remove(temp_edges)
         else:
+            self.kernel = tp.tpgraph.Kernel(n_neighbors=n_neighbors, n_jobs=1, metric='cosine', fuzzy=True, verbose=True)
+            self.kernel.fit(data)
             self.laplassian = np.array(self.kernel.L.todense())
             self.create_edges()
 
@@ -110,11 +117,11 @@ class DataStructureGraph(Individ):
 
         return new_object
     
-    def number_of_edges(self):
-        return self.graph.number_of_edges()
+    # def number_of_edges(self):
+    #     return self.graph.number_of_edges()
     
     def number_of_nodes(self):
-        return self.graph.number_of_nodes()
+        return len(self.graph.keys())
     
     def find_ED(self, eps):
         eds = euclidean_distances(self._source_data, self._source_data)
@@ -122,12 +129,12 @@ class DataStructureGraph(Individ):
         self.matrix_connect = eds
 
         for i in range(len(eds)):
-            for j in range(i, len(eds)):
+            for j in range(i+1, len(eds)):
                 if eds[i][j] / maxval <= eps:
                     self.laplassian[i][j] = 1 - eds[i][j] / maxval
                     self.laplassian[j][i] = 1 - eds[i][j] / maxval
                     # self.graph.add_edge(i, j, weight=eds[i][j])
-                    self.edges[i, j] = eds[i][j]
+                    self.graph[i]["neighbors"][j] = eds[i][j]
 
     def create_edges(self):
         eds = euclidean_distances(self._source_data, self._source_data)
@@ -138,34 +145,48 @@ class DataStructureGraph(Individ):
             # self.edges.append(Dict.empty(key_type=float64, value_type=int64))
             for j in range(i, len(eds)):
                 if self.laplassian[i][j] != 0:
-                    self.graph.add_edge(i, j, weight=eds[i][j])
+                    # self.graph.add_edge(i, j, weight=eds[i][j])
+                    self.graph[i]["neighbors"][j] = eds[i][j]
 
     def choosing_start_node(self):
         choose_index = None
-        for i, node in enumerate(self.graph.nodes):
+        for i, node in self.graph.items():
             try:
-                if len(self.graph.edges[choose_index]) < len(node):
+                if len(self.graph.get_edges(choose_index)) < len(node['neighbors']):
                     choose_index = i
             except:
                 choose_index = i
 
         return choose_index
     
+    def get_edges(self, for_node):
+        edges = self.graph[for_node]["neighbors"]
+        return edges
+    
+    def add_edge(self, from_node, to_node, weight):
+        if from_node < to_node:
+            self.graph[from_node]['neighbors'][to_node] = weight
+        else:
+            self.graph[to_node]['neighbors'][from_node] = weight
 
     def local_remove(self, edges_list):
         for edge in edges_list:
             self.laplassian[edge[0]][edge[1]] = 0
             self.laplassian[edge[1]][edge[0]] = 0
 
-            self.edges[edge[0]][edge[1]] = 0
-            self.edges[edge[1]][edge[0]] = 0
+            if edge[0] < edge[1]:
+                del self.graph[edge[0]]['neighbours'][edge[1]]
+            else:
+                del self.graph[edge[1]]['neighbours'][edge[0]]
 
     
     def replace_subgraph(self, node: int, new_edges: dict):
-        last_pairs = [(node, i) for i in dict(self.graph[node]).keys()]
-        self.graph.remove_edges_from(last_pairs)
+        # last_pairs = [(node, i) for i in self.get_edges(node).keys()]
+        # self.graph.remove_edges_from(last_pairs)
+        self.graph[node]['neighbors'] = {}
         for elem in new_edges:
-            self.graph.add_edge(node, elem, weight=new_edges[elem]['weight'])
+            # self.graph.add_edge(node, elem, weight=new_edges[elem]['weight'])
+            self.graph[node]['neighbors'][elem] = new_edges[elem]
 
 
     @staticmethod

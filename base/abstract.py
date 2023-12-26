@@ -83,7 +83,8 @@ class Individ(ComplexStructure):
         self._fitness = fitness
         self.elitism = False
         self.selected = False
-        self.graph = nx.Graph()
+        # self.graph = nx.Graph()
+        self.graph = {}
 
     @property
     def fitness(self):
