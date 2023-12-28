@@ -1,5 +1,6 @@
 from .abstract import Individ, Population
 
+import ast
 import numpy as np
 from progress.bar import Bar
 from numba.typed import Dict
@@ -72,27 +73,44 @@ class DataStructureGraph(Individ):
                 color = labels[i]                
             self.graph.add_nodes_from([(i, {"name": i, "params": elem, "label": color, "select": False})])
 
-        self.kernel = tp.tpgraph.Kernel(n_neighbors=n_neighbors, n_jobs=1, metric='cosine', fuzzy=True, verbose=True)
-        self.kernel.fit(data)
+        # self.kernel = tp.tpgraph.Kernel(n_neighbors=n_neighbors, n_jobs=1, metric='cosine', fuzzy=True, verbose=True)
+        # self.kernel.fit(data)
         self.laplassian = np.zeros((data.shape[0], data.shape[0]))
 
         self.fullness = 0 # 0-100
         print("INFO: create laplassian")
 
         if mode:
-            self.find_ED(eps)
-            self.edges = forming_dict(self.graph)
-            start_node_index = self.choosing_start_node()
-            res, temp_edges = DataStructureGraph.check_visible_neigh(self._source_data, self.edges, [start_node_index])
-            with open(f"info_log\\create_{self.__class__.__name__}_{datetime.now().strftime('%Y_%m_%d-%I_%M_%S_%p')}.txt", "w") as fl:
-                fl.write(str(res))
-            self.local_remove(temp_edges)
+            with open("exp1_edges_second.txt", "r") as fl:
+                res = fl.read()
+            res = ast.literal_eval(res)
+            self.set_laplassian(res)
+            # self.find_ED(eps)
+            # self.edges = forming_dict(self.graph)
+            # start_node_index = self.choosing_start_node()
+            # res, temp_edges = DataStructureGraph.check_visible_neigh(self._source_data, self.edges, [start_node_index])
+            # with open(f"info_log\\create_{self.__class__.__name__}_{datetime.now().strftime('%Y_%m_%d-%I_%M_%S_%p')}.txt", "w") as fl:
+            #     fl.write(str(res))
+            # self.local_remove(temp_edges)
         else:
             self.laplassian = np.array(self.kernel.L.todense())
             self.create_edges()
 
         self.calc_fullness()
         self.drawing = Draw(self.graph)
+
+    def __eq__(self, __value: object) -> bool:
+        return self.graph == __value.graph
+
+    def set_laplassian(self, res):
+        eds = euclidean_distances(self._source_data, self._source_data)
+        maxval = np.max(eds)
+        self.matrix_connect = eds
+        for i, edge in enumerate(res):
+            for elem in edge:
+                self.graph.add_edge(int(self.graph.nodes[i]["name"]), int(self.graph.nodes[edge[elem]]["name"]), weight=elem)
+                self.laplassian[i][edge[elem]] = 1 - self.matrix_connect[i][edge[elem]] / maxval
+                self.laplassian[edge[elem]][i] = 1 - self.matrix_connect[edge[elem]][i] / maxval
 
     def calc_fullness(self):
         self.fullness = (len(list(filter(lambda elem: elem == 0, self.laplassian.reshape(-1)))) / 2 * 100) // len(self.laplassian.reshape(-1))
@@ -208,11 +226,19 @@ class PopulationGraph(Population):
         self.anal = []
 
     def _evolutionary_step(self, *args):
+        print(len(self.structure))
         self.apply_operator('FitnessPopulation')
+        print("Fitness")
         self.apply_operator('Elitism')
+        print("Elitism")
         self.apply_operator("RouletteWheelSelection")
+        print("Roulet")
         self.apply_operator("CrossoverPopulation")
+        print("Crossover")
         self.apply_operator("MutationPopulation")
+        print("Mutation")
+        self.apply_operator("FilterPopulation")
+        print("Filter")
 
     def evolutionary(self, *args):
         print("INFO: create population")
@@ -428,6 +454,7 @@ class TakeNN:
             loss_mean = np.mean(loss_list)
 
             if graph:
+                epoch += 1
                 if t == 0:
                     last_loss = loss
                 else:
@@ -444,6 +471,29 @@ class TakeNN:
             # print('Surface training t={}, loss={}'.format(t, loss_mean), count_loss)
 
         self.model_settings["model"].eval()
+
+    
+    def get_loss(self, add_loss_func=None, graph=None, val=1):
+        permutation = randperm(self.features.size()[0])
+        loss_list = []
+        lmd = 1/((self.batch_size) ** 2)
+        for i in range(0, len(self.target), self.batch_size):
+            indices = permutation[i:i+self.batch_size]
+            # print(indices)
+            batch_x, target_y = self.features[indices], self.target[indices]
+            target_y = target_y.to(fl64)
+            output = self.model_settings["model"](batch_x)
+            loss = self.model_settings["criterion"](output, target_y.reshape_as(output))
+            if add_loss_func:
+                add_loss = add_loss_func(graph, output.detach().numpy(), indices)
+                # add_loss = adding_loss[indices]
+                try:
+                    loss += lmd * tensor(add_loss[0, 0])
+                except:
+                    loss += lmd * tensor(add_loss)
+            loss_list.append(loss.item())
+
+        return np.mean(loss_list)
 
     
     def get_current_loss(self, features, target, add_loss_func=None, graph=None):

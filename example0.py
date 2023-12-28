@@ -7,6 +7,7 @@ root_dir = '/'.join(os.getcwd().split("/")[:-1])
 sys.path.append(root_dir)
 
 import numpy as np
+from numba import njit
 import pandas as pd
 import logging
 from copy import deepcopy
@@ -18,27 +19,8 @@ from base.operators.builder import create_operator_map
 
 from generate_simple_data import create_swiss_roll
 
-def handler_of_data(data: Union[str, np.ndarray]):
-    if type(data) is str:
-        format_doc = data.split(".")[-1]
-        if format_doc == "arff":
-            from scipy.io.arff import loadarff
-            raw_data = pd.DataFrame(loadarff(data)[0])
-            # raw_data['day'] = raw_data['day'].astype('int32')
-            target_key = raw_data.keys()[-1]
-            feature_keys = raw_data.keys()[:-1]
-
-            target = raw_data[target_key]
-            for i, elem in enumerate(np.unique(target.to_numpy())):
-                target[target==elem] = i
-            target = target.astype(int)
-
-            feature = raw_data[feature_keys]
-            # feature = feature.to_numpy()
-    else:
-        feature = data[:, :-1]
-        target = data[:, -1]
-
+def handler_of_data(feature, target):
+    dims = len(feature.keys())
     try:
         grid_tensors = [torch.tensor(feature[key].values) for key in feature.keys()]
         grid_tensor = torch.stack(grid_tensors)
@@ -54,7 +36,8 @@ def handler_of_data(data: Union[str, np.ndarray]):
     test_features = grid_flattened[param:]
     test_target = torch.tensor(target)[param:]
 
-    return train_features, train_target, test_features, test_target
+    return train_features, train_target, test_features, test_target, dims
+
 
 def find_graph_loss(graph, f_x, indexs=None):
     if indexs is None:
@@ -67,19 +50,55 @@ def find_graph_loss(graph, f_x, indexs=None):
 
     return loss.reshape(-1)[0]
 
+@njit
+def find_loss_ind(laplassian, f_x, indexs=None):
+    if indexs is not None:
+        laplassian = laplassian[indexs][:indexs]
+    
+    part_1 = np.dot(f_x.T, laplassian)
+    loss = np.dot(part_1, f_x)
+
+    return loss.reshape(-1)
+
+
+def exp_real_data2():
+    from scipy.io.arff import loadarff
+    raw_data = loadarff("data/electricity-normalized.arff")
+    df_data = pd.DataFrame(raw_data[0])
+    df_data['day'] = df_data['day'].astype('int32')
+    up_data = df_data[df_data['class']==b'UP'][:2500]
+    down_data = df_data[df_data['class']==b'DOWN'][:2500]
+
+    work_data = up_data[:2000]
+    work_data = work_data.append(down_data[:2000])
+    work_data = work_data.append(up_data[2000:])
+    work_data = work_data.append(down_data[2000:])
+
+    # work_data = df_data[:5000]
+    # work_data = df_data
+
+    target = work_data['class'].to_numpy()
+    target[target==b'UP'] = 1
+    target[target==b'DOWN'] = 0
+    target = target.astype(dtype=int)
+    feature = work_data[['date', 'day', 'period', 'nswprice', 'nswdemand', 'vicprice', 'vicdemand', 'transfer']] 
+
+    return feature, target
+
 
 def main(data: Union[str, np.ndarray]):
-    train_feature, train_target, test_feature, test_target = handler_of_data(data=data)
+    feature, target = exp_real_data2()
+    train_feature, train_target, test_feature, test_target, dims = handler_of_data(feature, target)
     print(train_feature.shape)
 
     logging.info("Creating base individ...")
-    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), n_neighbors=20, mode=0)
-    base_model = TakeNN(train_feature, train_target, dims=train_feature.numpy().shape[1], num_epochs=30, batch_size=300)
+    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), n_neighbors=20)
+    base_model = TakeNN(train_feature, train_target, dims=dims, num_epochs=30, batch_size=500)
     logging.info("Creating map with operators and population")
 
     build_settings = {
         'mutation': {
-            'simple': dict(intensive=2, increase_prob=1),
+            'simple': dict(intensive=20, increase_prob=1),
         },
         'crossover': {
             'simple': dict(intensive=1, increase_prob=0.3)
@@ -96,7 +115,7 @@ def main(data: Union[str, np.ndarray]):
 
     create_operator_map(train_feature, base_individ, base_model.copy(), build_settings)
 
-    population = PopulationGraph(iterations=30)
+    population = PopulationGraph(iterations=1)
     population.evolutionary()
 
     base_model.train()

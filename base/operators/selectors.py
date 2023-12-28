@@ -16,7 +16,9 @@ class Elitism(GeneticOperatorPopulation):
         
         for idx in elite_idxs:
             population.structure[idx].elitism = True
-            population.base_model = individ.model.copy()
+            print("fit", population.structure[idx].fitness)
+            population.base_model = population.structure[idx].model.copy()
+            population.base_model.train(self.params["add_loss_function"], individ)
             # population.anal.append(population.structure[idx].fitness)
 
 class RouletteWheelSelection(GeneticOperatorPopulation):
@@ -56,3 +58,29 @@ class RouletteWheelSelection(GeneticOperatorPopulation):
         
         for individ in winners:
             individ.selected = True
+
+
+class FilterPopulation(GeneticOperatorPopulation):
+    def __init__(self, params: dict = None):
+        super().__init__(params)
+
+    def apply(self, population, *args, **kwargs):
+        new_strucutre = []
+        for individ in population.structure:
+            if individ not in new_strucutre:
+                new_strucutre.append(individ)
+
+        if self.params['population_size'] < len(new_structure):
+            elite = list(filter(lambda ind: ind.elitism, new_structure))
+
+            for individ in elite:
+                new_structure.remove(individ)
+            
+            population_fitnesses = list(map(lambda ind: 1/(ind.fitness+0.01), new_structure))
+            fits_sum = np.sum(population_fitnesses)
+            probabilities = list(map(lambda x: x / fits_sum, population_fitnesses))
+            new_structure = list(np.random.choice(new_structure, size=self.params['population_size']-1,
+                                                         p=probabilities, replace=False))
+            new_structure.extend(elite)
+
+        population.structure = new_strucutre

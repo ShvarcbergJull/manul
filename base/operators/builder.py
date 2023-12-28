@@ -4,6 +4,7 @@ from .initializers import InitPopulation
 
 from .selectors import Elitism
 from .selectors import RouletteWheelSelection
+from .selectors import FilterPopulation
 
 from .crossovers import CrossoverIndivid
 from .crossovers import CrossoverPopulation
@@ -29,7 +30,7 @@ def create_operator_map(grid, individ, model, kwargs):
                     base_model=model))
 
     operatorsMap.Elitism = Elitism(
-        params=dict(elitism=1)
+        params=dict(elitism=1, add_loss_function=fitness['add_loss_function'])
     )
 
     operatorsMap.RouletteWheelSelection = RouletteWheelSelection(
@@ -61,3 +62,7 @@ def create_operator_map(grid, individ, model, kwargs):
     )
 
     operatorsMap.FitnessPopulation = FitnessPopulation()
+
+    operatorsMap.FilterPopulation = FilterPopulation(
+        params=dict(population_size=population_size)
+    )
