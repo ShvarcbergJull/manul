@@ -18,7 +18,7 @@ class Elitism(GeneticOperatorPopulation):
             population.structure[idx].elitism = True
             print("fit", population.structure[idx].fitness)
             population.base_model = population.structure[idx].model.copy()
-            population.base_model.train(self.params["add_loss_function"], individ)
+            population.base_model.train(self.params["add_loss_function"], population.structure[idx].laplassian)
             # population.anal.append(population.structure[idx].fitness)
 
 class RouletteWheelSelection(GeneticOperatorPopulation):

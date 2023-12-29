@@ -20,7 +20,9 @@ from base.operators.builder import create_operator_map
 from generate_simple_data import create_swiss_roll
 
 def handler_of_data(feature, target):
-    dims = len(feature.keys())
+    # dims = len(feature.keys())
+    dims = feature.shape[-1]
+    print(dims)
     try:
         grid_tensors = [torch.tensor(feature[key].values) for key in feature.keys()]
         grid_tensor = torch.stack(grid_tensors)
@@ -39,12 +41,12 @@ def handler_of_data(feature, target):
     return train_features, train_target, test_features, test_target, dims
 
 
-def find_graph_loss(graph, f_x, indexs=None):
+def find_graph_loss(graph_laplassian, f_x, indexs=None):
     if indexs is None:
-        laplassian = graph.laplassian
+        laplassian = graph_laplassian
         
     else:
-        laplassian = graph.laplassian[indexs][:, indexs]
+        laplassian = graph_laplassian[indexs][:, indexs]
     part_1 = np.dot(f_x.T, laplassian)
     loss = np.dot(part_1, f_x)
 
@@ -87,7 +89,9 @@ def exp_real_data2():
 
 
 def main(data: Union[str, np.ndarray]):
-    feature, target = exp_real_data2()
+    # feature, target = exp_real_data2()
+    feature = data[:, :-1]
+    target = data[:, -1]
     train_feature, train_target, test_feature, test_target, dims = handler_of_data(feature, target)
     print(train_feature.shape)
 
@@ -141,9 +145,9 @@ def main(data: Union[str, np.ndarray]):
 
 
 if __name__ == "__main__":
-    # data = create_swiss_roll(3000)
-    data = "data/electricity-normalized.arff"
-    data = "data/phpSSK7iA.arff"
+    data = create_swiss_roll(5000)
+    # data = "data/electricity-normalized.arff"
+    # data = "data/phpSSK7iA.arff"
     main(data)
 
 

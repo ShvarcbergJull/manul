@@ -72,9 +72,11 @@ class DataStructureGraph(Individ):
         
         if mode:
             self.find_ED(eps, data)
-            temp_edges = forming_dict()
+            temp_edges = forming_dict(self.graph, self.matrix_connect)
             start_node_index = self.choosing_start_node()
             res, delete_edges = DataStructureGraph.check_visible_neigh(data, temp_edges, [start_node_index])
+            with open(f"info_log\\create_{self.__class__.__name__}_{datetime.now().strftime('%Y_%m_%d-%I_%M_%S_%p')}.txt", "w") as fl:
+                fl.write(str(res))
             self.local_remove(delete_edges)
         else:
             self.kernel = tp.tpgraph.Kernel(n_neighbors=n_neighbors, n_jobs=1, metric='cosine', fuzzy=True, verbose=True)
@@ -122,12 +124,6 @@ class DataStructureGraph(Individ):
 
         return new_object
     
-    def number_of_edges(self):
-        return self.graph.number_of_edges()
-    
-    def number_of_nodes(self):
-        return self.graph.number_of_nodes()
-    
     def find_ED(self, eps, source_data):
         eds = euclidean_distances(source_data, source_data)
         maxval = np.max(eds)
@@ -140,6 +136,18 @@ class DataStructureGraph(Individ):
                     # self.graph.add_edge(i, j, weight=eds[i][j])
                     self.graph[i].append(j)
                     self.number_of_edges += 1
+
+
+    def add_edge(self, from_node, to_node):
+        self.graph[from_node].append(to_node)
+        self.number_of_edges += 1
+
+    def remove_edge(self, from_node, to_node):
+        try:
+            self.graph[from_node].remove(to_node)
+        except:
+            self.graph[to_node].remove(from_node)
+        self.number_of_edges -= 1
 
     def create_edges(self):
         eds = euclidean_distances(self._source_data, self._source_data)
@@ -178,10 +186,9 @@ class DataStructureGraph(Individ):
 
     
     def replace_subgraph(self, node: int, new_edges: dict):
-        last_pairs = [(node, i) for i in dict(self.graph[node]).keys()]
-        self.graph.remove_edges_from(last_pairs)
+        self.graph[node] = []
         for elem in new_edges:
-            self.graph.add_edge(node, elem, weight=new_edges[elem]['weight'])
+            self.add_edge(node, elem)
 
 
     @staticmethod

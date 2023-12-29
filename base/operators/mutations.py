@@ -1,40 +1,54 @@
 from .base import GeneticOperatorIndivid, GeneticOperatorPopulation, apply_decorator
 import numpy as np
 
+from numba import njit
+
 class MutationIndivid(GeneticOperatorIndivid):
 
     def __init__(self, params) -> None:
         super().__init__(params=params)
         self._check_params('mut_intensive')
 
+    @staticmethod
+    @njit
+    def collect_elements(node, neighbours):
+        res = np.array([])
+        for i in neighbours:
+            np.append(res, [node, neighbours])
+        
+        return res
+
+
+
     @apply_decorator
     def apply(self, individ, *args, **kwargs):
         mut_intensive = self.params['mut_intensive']
+        fullness_individ = individ.fullness
+        num_nodes = individ.number_of_nodes
+        eds = individ.matrix_connect
+        graph = individ.graph
 
-        methods = np.random.choice(np.arange(2), size=mut_intensive, p=[individ.fullness / 100, 1 - (individ.fullness / 100)])
+        methods = np.random.choice(np.arange(2), size=mut_intensive, p=[fullness_individ / 100, 1 - (fullness_individ / 100)])
         for method in methods:
             if method:
                 # добавление
-                nodes = np.random.choice(np.arange(individ.number_of_nodes()), size=2, replace=False)
+                nodes = np.random.choice(np.arange(num_nodes), size=2, replace=False)
                 while individ.laplassian[nodes[0]][nodes[1]] != 0:
-                    nodes = np.random.choice(np.arange(individ.number_of_nodes()), size=2, replace=False)
-                new_weight = np.random.choice(np.linspace(np.min(individ.matrix_connect), np.max(individ.matrix_connect), individ.number_of_nodes()))
-                individ.graph.add_edge(nodes[0], nodes[1], weight=new_weight)
-
-                individ.laplassian[nodes[0]][nodes[1]] = 1 - individ.matrix_connect[nodes[0]][nodes[1]] / np.max(individ.matrix_connect)
-                individ.laplassian[nodes[1]][nodes[0]] = 1 - individ.matrix_connect[nodes[0]][nodes[1]] / np.max(individ.matrix_connect)
+                    nodes = np.random.choice(np.arange(num_nodes), size=2, replace=False)
+                individ.add_edge(nodes[0], nodes[1])
 
             else:
-                # удаление 
-                edges = np.array([[int(elem[0]), int(elem[1]), elem[2]["weight"]] for elem in list(individ.graph.edges(data=True))])
-                probability = edges[:, 2]
+                # удаление
+                # edges = np.array([[int(elem[0]), int(elem[1]), elem[2]["weight"]] for elem in list(individ.graph.edges(data=True))])
+                probability = []
+                edges = []
+                for key in graph:
+                    probability.extend(eds[key, graph[key]])
+                    edges.extend(MutationIndivid.collect_elements(key, graph[key]))
                 probability = probability / probability.sum()
                 edge_index = np.random.choice(np.arange(individ.number_of_edges()), size=1, p=probability.astype(np.float64))[0]
                 edge = edges[edge_index]
-                individ.graph.remove_edge(edge[0], edge[1])
-
-                individ.laplassian[int(edge[0])][int(edge[1])] = 0
-                individ.laplassian[int(edge[1])][int(edge[0])] = 0
+                individ.remove_edge(edge[0], edge[1])
 
 
 class MutationPopulation(GeneticOperatorPopulation):
