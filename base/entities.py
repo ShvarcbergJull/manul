@@ -17,7 +17,7 @@ import torch.nn as nn
 from torch import randperm, tensor
 from torch.optim import Adam
 from torch import float64 as fl64
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, roc_auc_score
 
 
 @njit
@@ -61,7 +61,7 @@ def forming_dict(graph, eds):
 
 class DataStructureGraph(Individ):
 
-    def __init__(self, data=None, labels=None, mode=1, n_neighbors=10, eps=0.5):
+    def __init__(self, data=None, labels=None, mode=1, n_neighbors=10, eps=0.5, graph_file: str = None):
         super().__init__()
         self.fullness = 0 # 0-100
         if data is None:
@@ -70,7 +70,12 @@ class DataStructureGraph(Individ):
         self.number_of_nodes = len(data)
         self.number_of_edges = 0
         
-        if mode:
+        if graph_file is not None:
+                with open("exp1_edges_second.txt", "r") as fl:
+                    graph_data = fl.read()
+                graph_data = ast.literal_eval(graph_data)
+                self.load_graph(data, graph_data)
+        elif mode:
             self.find_ED(eps, data)
             temp_edges = forming_dict(self.graph, self.matrix_connect)
             start_node_index = self.choosing_start_node()
@@ -95,13 +100,12 @@ class DataStructureGraph(Individ):
             laplassian[[key], [self.graph[key]]] = temp[[key], [self.graph[key]]]
         
         return laplassian
-    
 
     def __eq__(self, __value: object) -> bool:
         return self.graph == __value.graph
 
-    def set_laplassian(self, res):
-        eds = euclidean_distances(self._source_data, self._source_data)
+    def load_graph(self, data, res):
+        eds = euclidean_distances(data, data)
         maxval = np.max(eds)
         self.matrix_connect = eds
         for i, edge in enumerate(res):
@@ -186,6 +190,7 @@ class DataStructureGraph(Individ):
 
     
     def replace_subgraph(self, node: int, new_edges: dict):
+        self.number_of_edges -= len(self.graph[node])
         self.graph[node] = []
         for elem in new_edges:
             self.add_edge(node, elem)
@@ -230,22 +235,22 @@ class PopulationGraph(Population):
 
         self.iterations = iterations
         self.type_ = "PopulationOfGraphs"
-        self.anal = []
+        self.change_fitness = []
 
     def _evolutionary_step(self, *args):
         print(len(self.structure))
         self.apply_operator('FitnessPopulation')
-        print("Fitness")
+        # print("Fitness")
         self.apply_operator('Elitism')
-        print("Elitism")
+        # print("Elitism")
         self.apply_operator("RouletteWheelSelection")
-        print("Roulet")
+        # print("Roulet")
         self.apply_operator("CrossoverPopulation")
-        print("Crossover")
+        # print("Crossover")
         self.apply_operator("MutationPopulation")
-        print("Mutation")
+        # print("Mutation")
         self.apply_operator("FilterPopulation")
-        print("Filter")
+        # print("Filter")
 
     def evolutionary(self, *args):
         print("INFO: create population")
@@ -432,7 +437,8 @@ class TakeNN:
                 # output[output>0.5] = 1
                 # output[output<=0.5] = 0
                 # print(output.shape)
-                loss = self.model_settings["criterion"](output, target_y.reshape_as(output))
+                # loss = self.model_settings["criterion"](output, target_y.reshape_as(output))
+                loss = roc_auc_score(target_y.reshape_as(output), output.detach().numpy())
                 if add_loss_func:
                     add_loss = add_loss_func(graph, output.detach().numpy(), indices)
                     # add_loss = adding_loss[indices]
@@ -460,7 +466,7 @@ class TakeNN:
             # print(loss_list)
             loss_mean = np.mean(loss_list)
 
-            if graph:
+            if graph is not None:
                 epoch += 1
                 if t == 0:
                     last_loss = loss
@@ -490,7 +496,8 @@ class TakeNN:
             batch_x, target_y = self.features[indices], self.target[indices]
             target_y = target_y.to(fl64)
             output = self.model_settings["model"](batch_x)
-            loss = self.model_settings["criterion"](output, target_y.reshape_as(output))
+            # loss = self.model_settings["criterion"](output, target_y.reshape_as(output))
+            loss = roc_auc_score(target_y.reshape_as(output), output.detach().numpy())
             if add_loss_func:
                 add_loss = add_loss_func(graph, output.detach().numpy(), indices)
                 # add_loss = adding_loss[indices]

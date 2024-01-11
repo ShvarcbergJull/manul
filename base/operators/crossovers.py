@@ -15,28 +15,12 @@ class CrossoverIndivid(GeneticOperatorIndivid):
         ind1 = individ
         ind2 = kwargs['other_individ']
 
-        probability = np.array([len(ind1.graph[i]) + len(ind2.graph[i]) for i in range(ind1.number_of_nodes())])
+        probability = np.array([len(ind1.graph[i]) + len(ind2.graph[i]) for i in range(ind1.number_of_nodes)])
         probability = probability / probability.sum()
-        start_node_index = np.random.choice(np.arange(ind1.number_of_nodes()), size=1, p=probability)[0]
+        start_node_index = np.random.choice(np.arange(ind1.number_of_nodes), size=1, p=probability)[0]
 
-        subgraph1 = dict(ind1.graph[start_node_index]).copy()
-        subgraph2 = dict(ind2.graph[start_node_index]).copy()
-
-        keys = list(subgraph1.keys())
-        keys.extend(list(subgraph2.keys()))
-
-        keys = np.unique(keys)
-
-        temp_laplassian1 = ind1.laplassian.copy()
-        temp_laplassian2 = ind2.laplassian.copy()
-        for key in keys:
-            temp_laplassian1[key, :] = ind2.laplassian[key, :]
-            temp_laplassian1[:, key] = ind2.laplassian[:, key]
-            temp_laplassian2[key, :] = ind1.laplassian[key, :]
-            temp_laplassian2[:, key] = ind1.laplassian[:, key]
-        
-        ind1.laplassian = temp_laplassian1
-        ind2.laplassian = temp_laplassian2
+        subgraph1 = ind1.graph[start_node_index].copy()
+        subgraph2 = ind2.graph[start_node_index].copy()
 
         ind1.replace_subgraph(start_node_index, subgraph2)
         ind2.replace_subgraph(start_node_index, subgraph1)

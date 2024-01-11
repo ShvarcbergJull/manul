@@ -11,13 +11,13 @@ from numba import njit
 import pandas as pd
 import logging
 from copy import deepcopy
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, f1_score
 import matplotlib.pyplot as plt
 
 from base.entities import DataStructureGraph, PopulationGraph, TakeNN
 from base.operators.builder import create_operator_map
 
-from generate_simple_data import create_swiss_roll
+from generate_simple_data import create_swiss_roll, create_circle
 
 def handler_of_data(feature, target):
     # dims = len(feature.keys())
@@ -87,16 +87,32 @@ def exp_real_data2():
 
     return feature, target
 
+def exp_real_data3():
+    from scipy.io.arff import loadarff
+    raw_data = loadarff("data/phpSSK7iA.arff")
+    df_data = pd.DataFrame(raw_data[0])
+    target = df_data['target']
+    target[target==b'1'] = 1
+    target[target==b'0'] = 0
+    target = target.astype(int)
+
+    ks = list(df_data.keys())
+    ks = ks[:-1]
+    feature = df_data[ks]
+
+    return feature, target
+
 
 def main(data: Union[str, np.ndarray]):
     # feature, target = exp_real_data2()
-    feature = data[:, :-1]
-    target = data[:, -1]
+    feature, target = exp_real_data3()
+    # feature = data[:, :-1]
+    # target = data[:, -1]
     train_feature, train_target, test_feature, test_target, dims = handler_of_data(feature, target)
     print(train_feature.shape)
 
     logging.info("Creating base individ...")
-    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), n_neighbors=20)
+    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), n_neighbors=20, eps=0.25)
     base_model = TakeNN(train_feature, train_target, dims=dims, num_epochs=30, batch_size=500)
     logging.info("Creating map with operators and population")
 
@@ -119,7 +135,7 @@ def main(data: Union[str, np.ndarray]):
 
     create_operator_map(train_feature, base_individ, base_model.copy(), build_settings)
 
-    population = PopulationGraph(iterations=1)
+    population = PopulationGraph(iterations=15)
     population.evolutionary()
 
     base_model.train()
@@ -141,13 +157,22 @@ def main(data: Union[str, np.ndarray]):
     disp = ConfusionMatrixDisplay(confusion_matrix=cm)
     disp.plot()
     # plt.savefig(f"images/{k}_nn")
-    plt.show()  
+    plt.show()
+
+    metric_nn_1 = f1_score(test_target.reshape(-1), result1.reshape(-1), average=None)
+    metric_nn_2 = f1_score(test_target.reshape(-1), result2.reshape(-1), average=None)
+
+    with open("example0.txt", "w") as fl:
+        fl.write(str(list(metric_nn_1)))
+        fl.write("\n")
+        fl.write(str(list(metric_nn_2)))
 
 
 if __name__ == "__main__":
-    data = create_swiss_roll(5000)
+    # data = create_swiss_roll(1000)
+    # data = create_circle(5, 5000)
     # data = "data/electricity-normalized.arff"
-    # data = "data/phpSSK7iA.arff"
+    data = "data/phpSSK7iA.arff"
     main(data)
 
 

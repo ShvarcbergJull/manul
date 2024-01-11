@@ -1,4 +1,8 @@
 from copy import deepcopy
+from datetime import datetime
+import os
+import matplotlib.pyplot as plt
+import torch
 
 class SingletonClass(type):
     _instances = {}
@@ -39,6 +43,44 @@ class OperatorMap(metaclass=SingletonClass):
     def __setitem__(self, key, value):
         assert isinstance(value, GeneticOperator), 'Attribute must be "GeneticOperator" object'
         self.__dict__[key] = value
+
+class ProgramRun(metaclass=SingletonClass):
+    name_of_dir = f"info_log/{datetime.now().strftime('%Y_%m_%d-%I_%M_%S_%p')}"
+
+    def __init__(self, name_directory: None) -> None:
+        # create directory
+        if name_directory is None:
+            os.makedirs(self.name_of_dir)
+        else:
+            self.name_of_dir = name_directory
+
+    def save_confusion_matrix(self, name: str, data, data2 = None):
+        from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+        target_true = data[0]
+        target_predict = data[1]
+        cm = confusion_matrix(target_true.reshape(-1), target_predict.reshape(-1))
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+        disp.plot()
+
+        if data2 is not None:
+            target_true = data[0]
+            target_predict = data[1]
+            cm2 = confusion_matrix(target_true.reshape(-1), target_predict.reshape(-1))
+            disp2 = ConfusionMatrixDisplay(confusion_matrix=cm)
+            disp2.plot()
+
+        plt.savefig(f"{self.name_of_dir}/{name}")
+
+    def save_plot(self, name, data):
+        plt.plot(data)
+        plt.savefig(f"{self.name_of_dir}/{name}")
+
+    def save_model(self, model):
+        torch.save(model.state_dict(), f"{self.name_of_dir}/result_model.pt")\
+        
+    def load_model(self):
+        the_model = torch.load(f"{self.name_of_dir}/result_model.pt")
+        return the_model
 
 
 class GeneticOperatorIndivid(GeneticOperator):

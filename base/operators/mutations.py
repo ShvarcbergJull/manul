@@ -10,11 +10,11 @@ class MutationIndivid(GeneticOperatorIndivid):
         self._check_params('mut_intensive')
 
     @staticmethod
-    @njit
+    # @njit
     def collect_elements(node, neighbours):
-        res = np.array([])
+        res = []
         for i in neighbours:
-            np.append(res, [node, neighbours])
+            res.append([node, i])
         
         return res
 
@@ -45,8 +45,8 @@ class MutationIndivid(GeneticOperatorIndivid):
                 for key in graph:
                     probability.extend(eds[key, graph[key]])
                     edges.extend(MutationIndivid.collect_elements(key, graph[key]))
-                probability = probability / probability.sum()
-                edge_index = np.random.choice(np.arange(individ.number_of_edges()), size=1, p=probability.astype(np.float64))[0]
+                probability = probability / np.sum(probability)
+                edge_index = np.random.choice(np.arange(individ.number_of_edges), size=1, p=probability.astype(np.float64))[0]
                 edge = edges[edge_index]
                 individ.remove_edge(edge[0], edge[1])
 
