@@ -3,6 +3,7 @@ from datetime import datetime
 import os
 import matplotlib.pyplot as plt
 import torch
+import numpy as np
 
 class SingletonClass(type):
     _instances = {}
@@ -47,7 +48,7 @@ class OperatorMap(metaclass=SingletonClass):
 class ProgramRun(metaclass=SingletonClass):
     name_of_dir = f"info_log/{datetime.now().strftime('%Y_%m_%d-%I_%M_%S_%p')}"
 
-    def __init__(self, name_directory: None) -> None:
+    def __init__(self, name_directory=None) -> None:
         # create directory
         if name_directory is None:
             os.makedirs(self.name_of_dir)
@@ -66,17 +67,36 @@ class ProgramRun(metaclass=SingletonClass):
             target_true = data[0]
             target_predict = data[1]
             cm2 = confusion_matrix(target_true.reshape(-1), target_predict.reshape(-1))
-            disp2 = ConfusionMatrixDisplay(confusion_matrix=cm)
+            disp2 = ConfusionMatrixDisplay(confusion_matrix=cm2)
             disp2.plot()
 
         plt.savefig(f"{self.name_of_dir}/{name}")
+        plt.close()
 
     def save_plot(self, name, data):
         plt.plot(data)
         plt.savefig(f"{self.name_of_dir}/{name}")
+        plt.close()
 
-    def save_model(self, model):
-        torch.save(model.state_dict(), f"{self.name_of_dir}/result_model.pt")\
+    def save_graph(self, data):
+        graph_data = []
+        for i, edges in enumerate(data):
+            graph_data.append(edges.values())
+        with open(f"{self.name_of_dir}/graph.txt", "w") as fl:
+            fl.write(str(graph_data))
+
+    def save_boxplot(self, name, data):
+        data = np.array(data)
+        jg = data[:, 0, :]
+        eag = data[:, 1, :]
+
+        box_data = np.concatenate((jg, eag), axis=1)
+        plt.boxplot(box_data, labels=["1 класс,\nbase", "2 класс,\nbase", "1 класс,\nman", "2 класс,\nman"])
+        plt.savefig(f"{self.name_of_dir}/{name}")
+        plt.close()
+
+    def save_model(self, name, model):
+        torch.save(model.state_dict(), f"{self.name_of_dir}/{name}.pt")
         
     def load_model(self):
         the_model = torch.load(f"{self.name_of_dir}/result_model.pt")

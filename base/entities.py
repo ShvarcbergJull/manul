@@ -1,4 +1,5 @@
 from .abstract import Individ, Population
+from .operators.base import ProgramRun
 
 import ast
 import numpy as np
@@ -67,6 +68,8 @@ class DataStructureGraph(Individ):
         if data is None:
             return
         
+        runner = ProgramRun()
+        
         self.number_of_nodes = len(data)
         self.number_of_edges = 0
         
@@ -80,8 +83,7 @@ class DataStructureGraph(Individ):
             temp_edges = forming_dict(self.graph, self.matrix_connect)
             start_node_index = self.choosing_start_node()
             res, delete_edges = DataStructureGraph.check_visible_neigh(data, temp_edges, [start_node_index])
-            with open(f"info_log\\create_{self.__class__.__name__}_{datetime.now().strftime('%Y_%m_%d-%I_%M_%S_%p')}.txt", "w") as fl:
-                fl.write(str(res))
+            runner.save_graph(res)
             self.local_remove(delete_edges)
         else:
             self.kernel = tp.tpgraph.Kernel(n_neighbors=n_neighbors, n_jobs=1, metric='cosine', fuzzy=True, verbose=True)
@@ -107,12 +109,11 @@ class DataStructureGraph(Individ):
     def load_graph(self, data, res):
         eds = euclidean_distances(data, data)
         maxval = np.max(eds)
-        self.matrix_connect = eds
-        for i, edge in enumerate(res):
-            for elem in edge:
-                self.graph.add_edge(int(self.graph.nodes[i]["name"]), int(self.graph.nodes[edge[elem]]["name"]), weight=elem)
-                self.laplassian[i][edge[elem]] = 1 - self.matrix_connect[i][edge[elem]] / maxval
-                self.laplassian[edge[elem]][i] = 1 - self.matrix_connect[edge[elem]][i] / maxval
+        self.matrix_connect = eds / maxval
+
+        for i, edges in enumerate(res):
+            self.graph[i] = edges
+            self.number_of_edges += len(edges)
 
     def calc_fullness(self):
         self.fullness = (len(list(filter(lambda elem: elem == 0, self.laplassian.reshape(-1)))) / 2 * 100) // len(self.laplassian.reshape(-1))
@@ -236,9 +237,10 @@ class PopulationGraph(Population):
         self.iterations = iterations
         self.type_ = "PopulationOfGraphs"
         self.change_fitness = []
+        self.laplassian = None
 
     def _evolutionary_step(self, *args):
-        print(len(self.structure))
+        # print(len(self.structure))
         self.apply_operator('FitnessPopulation')
         # print("Fitness")
         self.apply_operator('Elitism')
@@ -437,8 +439,8 @@ class TakeNN:
                 # output[output>0.5] = 1
                 # output[output<=0.5] = 0
                 # print(output.shape)
-                # loss = self.model_settings["criterion"](output, target_y.reshape_as(output))
-                loss = roc_auc_score(target_y.reshape_as(output), output.detach().numpy())
+                loss = self.model_settings["criterion"](output, target_y.reshape_as(output))
+                # loss = roc_auc_score(target_y.reshape_as(output), output.detach().numpy())
                 if add_loss_func:
                     add_loss = add_loss_func(graph, output.detach().numpy(), indices)
                     # add_loss = adding_loss[indices]

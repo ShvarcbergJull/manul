@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 
 from base.entities import DataStructureGraph, PopulationGraph, TakeNN
 from base.operators.builder import create_operator_map
+from base.operators.base import ProgramRun
 
 from generate_simple_data import create_swiss_roll, create_circle
 
@@ -102,10 +103,87 @@ def exp_real_data3():
 
     return feature, target
 
+def exp_sonar():
+    import csv
+    rows = []
+    with open('data/sonar_dataset.csv', newline='') as csvfile:
+        spamreader = csv.reader(csvfile, delimiter=' ', quotechar='|')
+        for row in spamreader:
+            rows.append(list(row[0].split(',')))
+    rows = np.array(rows)
+    target_old = rows[:, -1]
+    features_old = rows[:, :-1]
+
+    datar = features_old[target_old == "R"]
+    datam = features_old[target_old == "M"]
+
+    targetr = features_old[target_old == "R"]
+    targetm = features_old[target_old == "M"]
+
+    features = []
+    target= [] 
+
+    num = np.max([len(datar), len(datam)])
+    for i in range(num):
+        try:
+            val1 = datar[i]
+        except:
+            features.extend(datam[i:])
+            target.extend(targetr[i:])
+            break
+
+        try:
+            val2 = datam[i]
+        except:
+            features.extend(datar[i:])
+            target.extend(targetm[i:])
+            break
+
+        features.append(val1)
+        features.append(val2)
+
+        target.append(targetr[i])
+        target.append(targetm[i])
+
+
+
+
+def run_experiment(base_model, test_feature, test_target, number):
+    runner = ProgramRun()
+
+    base_model.train()
+    result1 = base_model.model_settings['model'](test_feature)
+    result1 = result1.detach().numpy()
+    result1 = np.where(result1 > base_model.threshold, 1, 0)
+
+    metric_nn_1 = f1_score(test_target.reshape(-1), result1.reshape(-1), average=None)
+
+    population = PopulationGraph(iterations=15)
+    population.evolutionary()
+
+    population.base_model.train(find_graph_loss, population.laplassian)
+
+    result2 = population.base_model.model_settings['model'](test_feature)
+    result2 = result2.detach().numpy()
+    result2 = np.where(result2 > population.base_model.threshold, 1, 0)
+
+    metric_nn_2 = f1_score(test_target.reshape(-1), result2.reshape(-1), average=None)
+
+    runner.save_confusion_matrix(f"conf_just_model_{number}", data=[test_target, result1])
+    runner.save_confusion_matrix(f"conf_EA_model_{number}", data=[test_target, result2])
+    runner.save_plot(f"fitness_{number}", population.change_fitness)
+    runner.save_model(f"model_{number}", population.base_model.model_settings['model'])
+
+    return_dictionary = {
+        "f1_score": [list(metric_nn_1), list(metric_nn_2)],
+    }
+
+    return return_dictionary
+
 
 def main(data: Union[str, np.ndarray]):
-    # feature, target = exp_real_data2()
-    feature, target = exp_real_data3()
+    feature, target = exp_real_data2()
+    # feature, target = exp_real_data3()
     # feature = data[:, :-1]
     # target = data[:, -1]
     train_feature, train_target, test_feature, test_target, dims = handler_of_data(feature, target)
@@ -134,45 +212,59 @@ def main(data: Union[str, np.ndarray]):
     }
 
     create_operator_map(train_feature, base_individ, base_model.copy(), build_settings)
+    runner = ProgramRun()
 
-    population = PopulationGraph(iterations=15)
-    population.evolutionary()
+    boxplot_data = []
 
-    base_model.train()
+    for i in range(10):
+        result = run_experiment(base_model.copy(), test_feature, test_target, i)
+        boxplot_data.append(result['f1_score'])
 
-    result1 = base_model.model_settings['model'](test_feature)
-    result1 = result1.detach().numpy()
-    result1 = np.where(result1 > base_model.threshold, 1, 0)
+    runner.save_boxplot("boxplot", boxplot_data)
 
-    result2 = population.base_model.model_settings['model'](test_feature)
-    result2 = result2.detach().numpy()
-    result2 = np.where(result2 > population.base_model.threshold, 1, 0)
-    cm = confusion_matrix(test_target.reshape(-1), result1.reshape(-1))
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm)
-    disp.plot()
-    # plt.savefig(f"images/{k}_nn")
-    plt.show()
+    # population = PopulationGraph(iterations=15)
+    # population.evolutionary()
 
-    cm = confusion_matrix(test_target.reshape(-1), result2.reshape(-1))
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm)
-    disp.plot()
-    # plt.savefig(f"images/{k}_nn")
-    plt.show()
+    # base_model.train()
 
-    metric_nn_1 = f1_score(test_target.reshape(-1), result1.reshape(-1), average=None)
-    metric_nn_2 = f1_score(test_target.reshape(-1), result2.reshape(-1), average=None)
+    # result1 = base_model.model_settings['model'](test_feature)
+    # result1 = result1.detach().numpy()
+    # result1 = np.where(result1 > base_model.threshold, 1, 0)
 
-    with open("example0.txt", "w") as fl:
-        fl.write(str(list(metric_nn_1)))
-        fl.write("\n")
-        fl.write(str(list(metric_nn_2)))
+    # result2 = population.base_model.model_settings['model'](test_feature)
+    # result2 = result2.detach().numpy()
+    # result2 = np.where(result2 > population.base_model.threshold, 1, 0)
+
+    # runner.save_confusion_matrix("conf_just_model", data=[test_target, result1])
+    # runner.save_confusion_matrix("conf_EA_model", data=[test_target, result2])
+
+
+    # cm = confusion_matrix(test_target.reshape(-1), result1.reshape(-1))
+    # disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+    # disp.plot()
+    # # plt.savefig(f"images/{k}_nn")
+    # plt.show()
+
+    # cm = confusion_matrix(test_target.reshape(-1), result2.reshape(-1))
+    # disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+    # disp.plot()
+    # # plt.savefig(f"images/{k}_nn")
+    # plt.show()
+
+    # metric_nn_1 = f1_score(test_target.reshape(-1), result1.reshape(-1), average=None)
+    # metric_nn_2 = f1_score(test_target.reshape(-1), result2.reshape(-1), average=None)
+
+    # with open("example0.txt", "w") as fl:
+    #     fl.write(str(list(metric_nn_1)))
+    #     fl.write("\n")
+    #     fl.write(str(list(metric_nn_2)))
 
 
 if __name__ == "__main__":
     # data = create_swiss_roll(1000)
     # data = create_circle(5, 5000)
-    # data = "data/electricity-normalized.arff"
-    data = "data/phpSSK7iA.arff"
+    data = "data/electricity-normalized.arff"
+    # data = "data/phpSSK7iA.arff"
     main(data)
 
 
