@@ -161,7 +161,7 @@ def run_experiment(base_model, test_feature, test_target, number):
     population = PopulationGraph(iterations=15)
     population.evolutionary()
 
-    population.base_model.train(find_graph_loss, population.laplassian)
+    # population.base_model.train(find_graph_loss, population.laplassian)
 
     result2 = population.base_model.model_settings['model'](test_feature)
     result2 = result2.detach().numpy()
@@ -190,7 +190,7 @@ def main(data: Union[str, np.ndarray]):
     print(train_feature.shape)
 
     logging.info("Creating base individ...")
-    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), n_neighbors=20, eps=0.25)
+    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), graph_file="Info_log/real_data_2.txt", n_neighbors=20, eps=0.25)
     base_model = TakeNN(train_feature, train_target, dims=dims, num_epochs=30, batch_size=500)
     logging.info("Creating map with operators and population")
 
@@ -217,7 +217,8 @@ def main(data: Union[str, np.ndarray]):
     boxplot_data = []
 
     for i in range(10):
-        result = run_experiment(base_model.copy(), test_feature, test_target, i)
+        new_model = TakeNN(train_feature, train_target, dims=dims, num_epochs=30, batch_size=500)
+        result = run_experiment(new_model, test_feature, test_target, i)
         boxplot_data.append(result['f1_score'])
 
     runner.save_boxplot("boxplot", boxplot_data)

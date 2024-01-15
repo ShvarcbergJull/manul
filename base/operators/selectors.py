@@ -77,9 +77,10 @@ class FilterPopulation(GeneticOperatorPopulation):
             for individ in elite:
                 new_structure.remove(individ)
             
-            population_fitnesses = list(map(lambda ind: ind.fitness, new_structure))
+            population_fitnesses = list(map(lambda ind: ind.fitness + 0.01, new_structure))
             fits_sum = np.sum(population_fitnesses)
             probabilities = list(map(lambda x: x / fits_sum, population_fitnesses))
+            # print(self.params['population_size']-1, len(probabilities))
             new_structure = list(np.random.choice(new_structure, size=self.params['population_size']-1,
                                                          p=probabilities, replace=False))
             new_structure.extend(elite)

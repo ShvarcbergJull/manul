@@ -74,7 +74,7 @@ class DataStructureGraph(Individ):
         self.number_of_edges = 0
         
         if graph_file is not None:
-                with open("exp1_edges_second.txt", "r") as fl:
+                with open(graph_file, "r") as fl:
                     graph_data = fl.read()
                 graph_data = ast.literal_eval(graph_data)
                 self.load_graph(data, graph_data)
@@ -489,27 +489,32 @@ class TakeNN:
 
     
     def get_loss(self, add_loss_func=None, graph=None, val=1):
-        permutation = randperm(self.features.size()[0])
-        loss_list = []
-        lmd = 1/((self.batch_size) ** 2)
-        for i in range(0, len(self.target), self.batch_size):
-            indices = permutation[i:i+self.batch_size]
-            # print(indices)
-            batch_x, target_y = self.features[indices], self.target[indices]
-            target_y = target_y.to(fl64)
-            output = self.model_settings["model"](batch_x)
-            # loss = self.model_settings["criterion"](output, target_y.reshape_as(output))
-            loss = roc_auc_score(target_y.reshape_as(output), output.detach().numpy())
-            if add_loss_func:
-                add_loss = add_loss_func(graph, output.detach().numpy(), indices)
-                # add_loss = adding_loss[indices]
-                try:
-                    loss += lmd * tensor(add_loss[0, 0])
-                except:
-                    loss += lmd * tensor(add_loss)
-            loss_list.append(loss.item())
+        # permutation = randperm(self.features.size()[0])
+        # loss_list = []
+        # lmd = 1/((self.batch_size) ** 2)
+        output = self.model_settings["model"](self.features)
+        target_y = self.target.to(fl64)
+        return_loss = roc_auc_score(target_y.reshape_as(output), output.detach().numpy())
 
-        return np.mean(loss_list)
+        return return_loss
+        # for i in range(0, len(self.target), self.batch_size):
+        #     indices = permutation[i:i+self.batch_size]
+        #     # print(indices)
+        #     batch_x, target_y = self.features[indices], self.target[indices]
+        #     target_y = target_y.to(fl64)
+        #     output = self.model_settings["model"](batch_x)
+        #     # loss = self.model_settings["criterion"](output, target_y.reshape_as(output))
+        #     loss = roc_auc_score(target_y.reshape_as(output), output.detach().numpy())
+        #     if add_loss_func:
+        #         add_loss = add_loss_func(graph, output.detach().numpy(), indices)
+        #         # add_loss = adding_loss[indices]
+        #         try:
+        #             loss += lmd * tensor(add_loss[0, 0])
+        #         except:
+        #             loss += lmd * tensor(add_loss)
+        #     loss_list.append(loss.item())
+
+        # return np.mean(loss_list)
 
     
     def get_current_loss(self, features, target, add_loss_func=None, graph=None):

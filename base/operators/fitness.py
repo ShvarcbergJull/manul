@@ -26,9 +26,9 @@ class VarFitnessIndivid(GeneticOperatorIndivid):
 
     def apply(self, individ, *args, **kwargs) -> None:
         individ.model = kwargs['base_model'].copy()
-        # individ.model.train(self.params["add_loss_function"], individ)
+        individ.model.train(self.params["add_loss_function"], individ.laplassian)
         # individ.fitness = individ.model.get_current_loss(self.params['test_feature'], self.params['test_target'], self.params['add_loss_function'], individ)
-        individ.fitness = individ.model.get_loss(self.params["add_loss_function"], individ.laplassian)
+        individ.fitness = individ.model.get_loss()
 
 
 class FitnessPopulation(GeneticOperatorPopulation):

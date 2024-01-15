@@ -81,7 +81,7 @@ class ProgramRun(metaclass=SingletonClass):
     def save_graph(self, data):
         graph_data = []
         for i, edges in enumerate(data):
-            graph_data.append(edges.values())
+            graph_data.append(list(edges.values()))
         with open(f"{self.name_of_dir}/graph.txt", "w") as fl:
             fl.write(str(graph_data))
 
