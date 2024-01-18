@@ -117,11 +117,11 @@ def exp_sonar():
     datar = features_old[target_old == "R"]
     datam = features_old[target_old == "M"]
 
-    targetr = features_old[target_old == "R"]
-    targetm = features_old[target_old == "M"]
+    targetr = target_old[target_old == "R"]
+    targetm = target_old[target_old == "M"]
 
     features = []
-    target= [] 
+    target= []
 
     num = np.max([len(datar), len(datam)])
     for i in range(num):
@@ -129,14 +129,14 @@ def exp_sonar():
             val1 = datar[i]
         except:
             features.extend(datam[i:])
-            target.extend(targetr[i:])
+            target.extend(targetm[i:])
             break
 
         try:
             val2 = datam[i]
         except:
             features.extend(datar[i:])
-            target.extend(targetm[i:])
+            target.extend(targetr[i:])
             break
 
         features.append(val1)
@@ -145,7 +145,128 @@ def exp_sonar():
         target.append(targetr[i])
         target.append(targetm[i])
 
+    target = np.array(target)
+    features = np.array(features)
 
+    target[target == "R"] = 0
+    target[target == "M"] = 1
+
+    features = features.astype("float64")
+    target = target.astype("int64")
+
+    return features, target
+
+
+def expe_water():
+    import csv
+    rows = []
+    with open("data/water_potability.csv", newline='') as csvfile:
+        spamreader = csv.reader(csvfile, delimiter=' ', quotechar='|')
+        for row in spamreader:
+            rows.append(list(row[0].split(',')))
+    rows = np.array(rows)
+    rows = rows[1:, [1,2,3,5,6,8,9]]
+
+    target_old = rows[:, -1].astype("int64")
+    features_old = rows[:, :-1].astype("float64")
+
+    data_0 = features_old[target_old == 0]
+    data_1 = features_old[target_old == 1]
+
+    target_0 = target_old[target_old == 0]
+    target_1 = target_old[target_old == 1]
+
+    features = []
+    target= []
+
+    num = np.max([len(data_0), len(data_1)])
+    for i in range(num):
+        try:
+            val1 = data_0[i]
+        except:
+            # features.extend(data_1[i:])
+            # target.extend(target_1[i:])
+            break
+
+        try:
+            val2 = data_1[i]
+        except:
+            # features.extend(data_0[i:])
+            # target.extend(target_0[i:])
+            break
+
+        features.append(val1)
+        features.append(val2)
+
+        target.append(target_0[i])
+        target.append(target_1[i])
+
+    target = np.array(target)
+    features = np.array(features)
+
+    return features, target
+
+def exp_airlines():
+    import pandas as pd
+    df = pd.read_csv("data/airlines_delay.csv")
+    unique_lines = df["Airline"].unique()
+    unique_ports = df["AirportFrom"].unique()
+
+    ar = np.array(df["Airline"])
+    dr = np.array(df["AirportFrom"])
+    fr = np.array(df["AirportTo"])
+
+    for i, value in enumerate(unique_lines):
+        ar[ar == value] = i
+
+    for i, value in enumerate(unique_ports):
+        dr[dr == value] = i
+        fr[fr == value] = i
+
+    ar = np.array([ar, dr, fr])
+
+    features = df[["Flight", "Time", "Length", "DayOfWeek"]].to_numpy()
+    features = np.hstack([features, ar.T])
+    target = df['Class'].to_numpy()
+
+    target_old = target.astype("int64")
+    features_old = features.astype("float64")
+
+    data_0 = features_old[target_old == 0]
+    data_1 = features_old[target_old == 1]
+
+    target_0 = target_old[target_old == 0]
+    target_1 = target_old[target_old == 1]
+
+    features = []
+    target= []
+
+    num = np.max([len(data_0), len(data_1)])
+    for i in range(num):
+        try:
+            val1 = data_0[i]
+        except:
+            features.extend(data_1[i:])
+            target.extend(target_1[i:])
+            break
+
+        try:
+            val2 = data_1[i]
+        except:
+            features.extend(data_0[i:])
+            target.extend(target_0[i:])
+            break
+
+        features.append(val1)
+        features.append(val2)
+
+        target.append(target_0[i])
+        target.append(target_1[i])
+
+    target = np.array(target)
+    features = np.array(features)
+
+    return features[:6000], target[:6000]
 
 
 def run_experiment(base_model, test_feature, test_target, number):
@@ -171,6 +292,7 @@ def run_experiment(base_model, test_feature, test_target, number):
 
     runner.save_confusion_matrix(f"conf_just_model_{number}", data=[test_target, result1])
     runner.save_confusion_matrix(f"conf_EA_model_{number}", data=[test_target, result2])
+    # runner.save_confusion_matrix(f"conf_matrix_{number}", data=[test_target, result1], data2=[test_target, result2])
     runner.save_plot(f"fitness_{number}", population.change_fitness)
     runner.save_model(f"model_{number}", population.base_model.model_settings['model'])
 
@@ -182,21 +304,24 @@ def run_experiment(base_model, test_feature, test_target, number):
 
 
 def main(data: Union[str, np.ndarray]):
-    feature, target = exp_real_data2()
+    # feature, target = exp_sonar()
+    # feature, target = exp_real_data2()
     # feature, target = exp_real_data3()
+    # feature, target = expe_water()
+    feature, target = exp_airlines()
     # feature = data[:, :-1]
     # target = data[:, -1]
     train_feature, train_target, test_feature, test_target, dims = handler_of_data(feature, target)
     print(train_feature.shape)
 
     logging.info("Creating base individ...")
-    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), graph_file="Info_log/real_data_2.txt", n_neighbors=20, eps=0.25)
+    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), graph_file="Info_log/graph_air_025.txt", n_neighbors=20, eps=0.25)
     base_model = TakeNN(train_feature, train_target, dims=dims, num_epochs=30, batch_size=500)
     logging.info("Creating map with operators and population")
 
     build_settings = {
         'mutation': {
-            'simple': dict(intensive=20, increase_prob=1),
+            'simple': dict(intensive=10, increase_prob=1),
         },
         'crossover': {
             'simple': dict(intensive=1, increase_prob=0.3)
@@ -264,8 +389,10 @@ def main(data: Union[str, np.ndarray]):
 if __name__ == "__main__":
     # data = create_swiss_roll(1000)
     # data = create_circle(5, 5000)
-    data = "data/electricity-normalized.arff"
+    # data = "data/electricity-normalized.arff"
     # data = "data/phpSSK7iA.arff"
+    # data = "data/sonar_dataset.csv"
+    data = "data/water_potability.csv"
     main(data)
 
 

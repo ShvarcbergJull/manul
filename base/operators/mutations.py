@@ -25,6 +25,7 @@ class MutationIndivid(GeneticOperatorIndivid):
         mut_intensive = self.params['mut_intensive']
         fullness_individ = individ.fullness
         num_nodes = individ.number_of_nodes
+        mut_intensive = int(num_nodes / 100 * mut_intensive)
         eds = individ.matrix_connect
         graph = individ.graph
 

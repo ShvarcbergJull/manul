@@ -61,14 +61,22 @@ class ProgramRun(metaclass=SingletonClass):
         target_predict = data[1]
         cm = confusion_matrix(target_true.reshape(-1), target_predict.reshape(-1))
         disp = ConfusionMatrixDisplay(confusion_matrix=cm)
-        disp.plot()
+        
 
         if data2 is not None:
-            target_true = data[0]
-            target_predict = data[1]
+            f, axes = plt.subplots(1, 2, sharey='row')
+            target_true = data2[0]
+            target_predict = data2[1]
             cm2 = confusion_matrix(target_true.reshape(-1), target_predict.reshape(-1))
             disp2 = ConfusionMatrixDisplay(confusion_matrix=cm2)
-            disp2.plot()
+            disp.plot(ax=axes[0])
+            disp.im_.colorbar.remove()
+            disp2.plot(ax=axes[1])
+            disp2.im_.colorbar.remove()
+
+            f.colorbar(disp.im_, ax=axes)
+        else:
+            disp.plot()
 
         plt.savefig(f"{self.name_of_dir}/{name}")
         plt.close()
@@ -98,8 +106,8 @@ class ProgramRun(metaclass=SingletonClass):
     def save_model(self, name, model):
         torch.save(model.state_dict(), f"{self.name_of_dir}/{name}.pt")
         
-    def load_model(self):
-        the_model = torch.load(f"{self.name_of_dir}/result_model.pt")
+    def load_model(self, name):
+        the_model = torch.load(name)
         return the_model
 
 
