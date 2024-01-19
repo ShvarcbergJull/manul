@@ -11,7 +11,7 @@ from numba import njit
 import pandas as pd
 import logging
 from copy import deepcopy
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, f1_score
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, f1_score, mean_squared_error
 import matplotlib.pyplot as plt
 
 from base.entities import DataStructureGraph, PopulationGraph, TakeNN
@@ -268,6 +268,14 @@ def exp_airlines():
 
     return features[:6000], target[:6000]
 
+def wine_example():
+    import pandas as pd
+    df = pd.read_csv("data/winequality-red.csv")
+    features = df[df.keys()[:-1]].to_numpy()
+    target = df[df.keys()[-1]].to_numpy()
+
+    return features, target
+
 
 def run_experiment(base_model, test_feature, test_target, number):
     runner = ProgramRun()
@@ -302,20 +310,50 @@ def run_experiment(base_model, test_feature, test_target, number):
 
     return return_dictionary
 
+def run_experiment_regression(base_model, test_feature, test_target, number):
+    runner = ProgramRun()
+
+    base_model.train()
+    result1 = base_model.model_settings['model'](test_feature)
+    result1 = result1.detach().numpy()
+
+    metric_nn_1 = mean_squared_error(test_target.reshape(-1), result1.reshape(-1))
+
+    population = PopulationGraph(iterations=15)
+    population.evolutionary()
+
+    # population.base_model.train(find_graph_loss, population.laplassian)
+
+    result2 = population.base_model.model_settings['model'](test_feature)
+    result2 = result2.detach().numpy()
+
+    metric_nn_2 = mean_squared_error(test_target.reshape(-1), result2.reshape(-1))
+
+    runner.save_plots(name=f"result_{number}", data=[test_target.reshape(-1), result1.reshape(-1), result2.reshape(-1)], labels=["target", "base", "man"])
+    runner.save_plot(f"fitness_{number}", population.change_fitness)
+    runner.save_model(f"model_{number}", population.base_model.model_settings['model'])
+
+    return_dictionary = {
+        "f1_score": [list(metric_nn_1), list(metric_nn_2)],
+    }
+
+    return return_dictionary
+
 
 def main(data: Union[str, np.ndarray]):
     # feature, target = exp_sonar()
     # feature, target = exp_real_data2()
     # feature, target = exp_real_data3()
     # feature, target = expe_water()
-    feature, target = exp_airlines()
+    # feature, target = exp_airlines()
+    feature, target = wine_example()
     # feature = data[:, :-1]
     # target = data[:, -1]
     train_feature, train_target, test_feature, test_target, dims = handler_of_data(feature, target)
     print(train_feature.shape)
 
     logging.info("Creating base individ...")
-    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), graph_file="Info_log/graph_air_025.txt", n_neighbors=20, eps=0.25)
+    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), graph_file="Info_log/graph_wine.txt", n_neighbors=20, eps=0.25)
     base_model = TakeNN(train_feature, train_target, dims=dims, num_epochs=30, batch_size=500)
     logging.info("Creating map with operators and population")
 
@@ -343,7 +381,7 @@ def main(data: Union[str, np.ndarray]):
 
     for i in range(10):
         new_model = TakeNN(train_feature, train_target, dims=dims, num_epochs=30, batch_size=500)
-        result = run_experiment(new_model, test_feature, test_target, i)
+        result = run_experiment_regression(new_model, test_feature, test_target, i)
         boxplot_data.append(result['f1_score'])
 
     runner.save_boxplot("boxplot", boxplot_data)

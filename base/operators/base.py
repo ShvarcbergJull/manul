@@ -86,6 +86,15 @@ class ProgramRun(metaclass=SingletonClass):
         plt.savefig(f"{self.name_of_dir}/{name}")
         plt.close()
 
+    def save_plots(self, name, data, labels=None):
+        for i, data_i in enumerate(data):
+            label_data = i
+            if labels is not None:
+                label_data = labels[i]
+            plt.plot(data_i, label=label_data)
+        plt.savefig(f"{self.name_of_dir}/{name}")
+        plt.close()
+
     def save_graph(self, data):
         graph_data = []
         for i, edges in enumerate(data):

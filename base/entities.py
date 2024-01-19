@@ -437,11 +437,7 @@ class TakeNN:
                 target_y = target_y.to(fl64)
                 self.model_settings["optimizer"].zero_grad()
                 output = self.model_settings["model"](batch_x)
-                # output[output>0.5] = 1
-                # output[output<=0.5] = 0
-                # print(output.shape)
                 loss = self.model_settings["criterion"](output, target_y.reshape_as(output))
-                # loss = roc_auc_score(target_y.reshape_as(output), output.detach().numpy())
                 if add_loss_func:
                     add_loss = add_loss_func(graph, output.detach().numpy(), indices)
                     # add_loss = adding_loss[indices]
@@ -450,18 +446,13 @@ class TakeNN:
                     except:
                         loss += lmd * tensor(add_loss)
                     # loss += lmd * torch.tensor(add_loss)
-                fpr, tpr, thresholds = roc_curve(target_y.reshape(-1), output.detach().numpy().reshape(-1))
-                gmeans = np.sqrt(tpr * (1-fpr))
-                ix = np.argmax(gmeans)
-                # print("IX", thresholds[ix])
-                if not self.threshold:
-                    self.threshold = thresholds[ix]
-                else:
-                    self.threshold = np.mean([thresholds[ix], self.threshold])
-                # loss = torch.mean(torch.abs(target_y-output))
-                # loss = np.mean(np.abs(output - (target_y.reshape_as(output)).detach().numpy()))
-                
-                # print(loss)
+                # fpr, tpr, thresholds = roc_curve(target_y.reshape(-1), output.detach().numpy().reshape(-1))
+                # gmeans = np.sqrt(tpr * (1-fpr))
+                # ix = np.argmax(gmeans)
+                # if not self.threshold:
+                #     self.threshold = thresholds[ix]
+                # else:
+                #     self.threshold = np.mean([thresholds[ix], self.threshold])
                 loss.backward()
                 self.model_settings["optimizer"].step()
                 # print(loss.item())
