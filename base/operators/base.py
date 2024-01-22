@@ -92,6 +92,7 @@ class ProgramRun(metaclass=SingletonClass):
             if labels is not None:
                 label_data = labels[i]
             plt.plot(data_i, label=label_data)
+        plt,legend()
         plt.savefig(f"{self.name_of_dir}/{name}")
         plt.close()
 

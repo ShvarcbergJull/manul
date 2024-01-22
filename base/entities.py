@@ -382,7 +382,7 @@ class TakeNN:
                 nn.Linear(256, 64, dtype=fl64),
                 nn.ReLU(),
                 nn.Linear(64, 1, dtype=fl64),
-                nn.Sigmoid()
+                # nn.Sigmoid()
                 # nn.LogSoftmax(dim=1)
             )
 
