@@ -118,6 +118,19 @@ class DataStructureGraph(Individ):
     def calc_fullness(self):
         self.fullness = (len(list(filter(lambda elem: elem == 0, self.laplassian.reshape(-1)))) / 2 * 100) // len(self.laplassian.reshape(-1))
 
+    def save_end_graph(self, num):
+        runner = ProgramRun()
+        res = []
+        for i in range(self.number_of_nodes):
+            try:
+                val = self.graph[i]
+            except:
+                val = []
+            
+            res.append(val)
+        runner.save_end_graph(res, name=f'graph_{num}.txt')
+
+
 
     def copy(self):
         new_object = self.__class__()
@@ -254,7 +267,7 @@ class PopulationGraph(Population):
         self.apply_operator("FilterPopulation")
         # print("Filter")
 
-    def evolutionary(self, *args):
+    def evolutionary(self, num, *args):
         print("INFO: create population")
         self.apply_operator('InitPopulation')
         bar = Bar('Evolution', max=self.iterations)
@@ -264,6 +277,12 @@ class PopulationGraph(Population):
             # print('{}/{}\n'.format(n, self.iterations))
             self._evolutionary_step()
             bar.next()
+        for individ in self.structure:
+            if individ.elitism == True:
+                self.base_model = individ.model.copy()
+                self.laplassian = individ.laplassian
+                individ.save_end_graph(num)
+                break
         bar.finish()
 
 def _methods_decorator(method):
@@ -483,8 +502,10 @@ class TakeNN:
     def get_loss(self, add_loss_func=None, graph=None, val=1):
         output = self.model_settings["model"](self.features)
         target_y = self.target.to(fl64)
+        nw_output = output.detach().numpy()
+        nw_output = nw_output.round().astype("int64")
         # return_loss = roc_auc_score(target_y.reshape_as(output), output.detach().numpy())
-        return_loss = mean_squared_error(target_y.reshape_as(output), output.detach().numpy())
+        return_loss = mean_squared_error(target_y.reshape_as(output), nw_output)
 
         return 1/return_loss
 

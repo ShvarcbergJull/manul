@@ -91,17 +91,21 @@ class ProgramRun(metaclass=SingletonClass):
             label_data = i
             if labels is not None:
                 label_data = labels[i]
-            plt.plot(data_i, label=label_data)
-        plt,legend()
+            plt.scatter(np.arange(len(data_i)), data_i, label=label_data)
+        plt.legend()
         plt.savefig(f"{self.name_of_dir}/{name}")
         plt.close()
 
-    def save_graph(self, data):
+    def save_graph(self, data, name='graph.txt'):
         graph_data = []
         for i, edges in enumerate(data):
             graph_data.append(list(edges.values()))
-        with open(f"{self.name_of_dir}/graph.txt", "w") as fl:
+        with open(f"{self.name_of_dir}/{name}", "w") as fl:
             fl.write(str(graph_data))
+
+    def save_end_graph(self, data, name='graph.txt'):
+        with open(f"{self.name_of_dir}/{name}", "w") as fl:
+            fl.write(str(data))
 
     def save_boxplot(self, name, data):
         data = np.array(data)

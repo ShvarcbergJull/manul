@@ -16,9 +16,9 @@ class Elitism(GeneticOperatorPopulation):
         
         for idx in elite_idxs:
             population.structure[idx].elitism = True
-            # print("fit", population.structure[idx].fitness)
-            population.base_model = population.structure[idx].model.copy()
-            population.laplassian = population.structure[idx].laplassian
+            # population.base_model = population.structure[idx].model.copy()
+            # population.laplassian = population.structure[idx].laplassian
+
             # population.base_model.train(self.params["add_loss_function"], population.structure[idx].laplassian)
             population.change_fitness.append(population.structure[idx].fitness)
 

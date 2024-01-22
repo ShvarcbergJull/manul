@@ -276,6 +276,20 @@ def wine_example():
 
     return features, target
 
+def mammonth_example():
+    import ast
+    fl = open("data/mammoth_3d.json ", "r")
+    data = fl.read()
+    data.ast.literal_eval(data)
+
+    data = np.array(data)
+    N = len(data)
+    colors = np.linspace(0, 0.9, N)
+
+    data = np.array(sorted(data, key=lambda parameters: parameters[2]))
+
+    return data, colors
+
 
 def run_experiment(base_model, test_feature, test_target, number):
     runner = ProgramRun()
@@ -316,25 +330,28 @@ def run_experiment_regression(base_model, test_feature, test_target, number):
     base_model.train()
     result1 = base_model.model_settings['model'](test_feature)
     result1 = result1.detach().numpy()
+    result1 = result1.round().astype("int64")
 
     metric_nn_1 = mean_squared_error(test_target.reshape(-1), result1.reshape(-1))
 
     population = PopulationGraph(iterations=15)
-    population.evolutionary()
+    population.evolutionary(num=number)
 
     # population.base_model.train(find_graph_loss, population.laplassian)
 
     result2 = population.base_model.model_settings['model'](test_feature)
     result2 = result2.detach().numpy()
+    result2 = result2.round().astype("int64")
 
     metric_nn_2 = mean_squared_error(test_target.reshape(-1), result2.reshape(-1))
 
     runner.save_plots(name=f"result_{number}", data=[test_target.reshape(-1), result1.reshape(-1), result2.reshape(-1)], labels=["target", "base", "man"])
+    runner.save_plots(name=f"dif_result_{number}", data=[abs(test_target.reshape(-1) - result1.reshape(-1)), abs(test_target.reshape(-1) - result2.reshape(-1))], labels=["dif_base", "dif_man"])
     runner.save_plot(f"fitness_{number}", population.change_fitness)
     runner.save_model(f"model_{number}", population.base_model.model_settings['model'])
 
     return_dictionary = {
-        "f1_score": [list(metric_nn_1), list(metric_nn_2)],
+        "f1_score": [metric_nn_1, metric_nn_2],
     }
 
     return return_dictionary
