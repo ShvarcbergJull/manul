@@ -139,6 +139,10 @@ class DataStructureGraph(Individ):
         new_object.number_of_nodes = self.number_of_nodes
         new_object.fullness = self.fullness
         new_object.matrix_connect = deepcopy(self.matrix_connect)
+        try:
+            new_object.model = self.model.copy()
+        except:
+            print("Step of init")
 
         return new_object
     
@@ -292,101 +296,6 @@ def _methods_decorator(method):
         return method(*args, **kwargs)
     return wrapper
 
-class Draw:
-
-    def __init__(self, graph) -> None:
-        self.graph = graph
-
-    def draw_lowd(self, nodes):
-        edges=[]
-        for edge in self.graph.edges:
-            edges.append(edge.prev.new_params)
-            edges.append(edge.next.new_params)
-            edges.append([None for i in range(len(edge.prev.new_params))])
-        
-        edges = np.array(edges).T
-        edge_trace = go.Scatter(x=edges[0], y=edges[1], line=dict(width=4, color='#888'), hoverinfo='none', mode='lines')
-        
-        nodes = np.array([node.new_params for node in self.graph.nodes]).T
-        colors = np.array([node.color for node in self.graph.nodes])
-        node_trace = go.Scatter(x=nodes[0], y=nodes[1], mode='markers', hoverinfo='text',
-                                  marker=dict(
-                                      showscale=True,
-                                      # colorscale options
-                                      # #'Greys' | 'YlGnBu' | 'Greens' | 'YlOrRd' | 'Bluered' | 'RdBu' |
-                                      # #'Reds' | 'Blues' | 'Picnic' | 'Rainbow' | 'Portland' | 'Jet' |
-                                      # #'Hot' | 'Blackbody' | 'Earth' | 'Electric' | 'Viridis' |
-                                      colorscale='YlGnBu',
-                                      reversescale=True,
-                                      color=colors,
-                                      size=10,
-                                  colorbar=dict(
-                                    thickness=15,
-                                    title='Node Connections',
-                                    xanchor='left',
-                                    titleside='right'
-                                  ),
-                                  line_width=2))
-        
-        return edge_trace, node_trace
-    
-    def draw_highd(self):
-        edges=[]
-        for edge in self.graph.edges:
-            edges.append(self.graph.nodes[edge[0]]["params"])
-            edges.append(self.graph.nodes[edge[1]]["params"])
-            edges.append([None for i in range(len(self.graph.nodes[edge[0]]["params"]))])
-        
-        edges = np.array(edges).T
-        edge_trace = go.Scatter3d(x=edges[0], y=edges[1], z=edges[2], line=dict(width=4, color='#888'), hoverinfo='none', mode='lines')
-        
-        nodes = np.array([self.graph.nodes[node]["params"] for node in self.graph.nodes]).T
-        colors = np.array([self.graph.nodes[node]["label"] for node in self.graph.nodes])
-        node_trace = go.Scatter3d(x=nodes[0], y=nodes[1], z=nodes[2], mode='markers', hoverinfo='text',
-                                  marker=dict(
-                                      showscale=True,
-                                      # colorscale options
-                                      # #'Greys' | 'YlGnBu' | 'Greens' | 'YlOrRd' | 'Bluered' | 'RdBu' |
-                                      # #'Reds' | 'Blues' | 'Picnic' | 'Rainbow' | 'Portland' | 'Jet' |
-                                      # #'Hot' | 'Blackbody' | 'Earth' | 'Electric' | 'Viridis' |
-                                      colorscale='YlGnBu',
-                                      reversescale=True,
-                                      color=colors,
-                                      size=10,
-                                  colorbar=dict(
-                                    thickness=15,
-                                    title='Node Connections',
-                                    xanchor='left',
-                                    titleside='right'
-                                  ),
-                                  line_width=2))
-        
-        return edge_trace, node_trace
-
-    def draw_graph(self, mode=0, data=None):
-
-        if mode:
-            edge_trace, node_trace = self.draw_lowd(data)
-        else:
-            edge_trace, node_trace = self.draw_highd()       
-        
-        fig = go.Figure(data=[edge_trace, node_trace],
-             layout=go.Layout(
-                title='<br>Network graph made with Python',
-                titlefont_size=16,
-                showlegend=False,
-                hovermode='closest',
-                margin=dict(b=20,l=5,r=5,t=40),
-                annotations=[ dict(
-                    text="Python code: <a href='https://plotly.com/ipython-notebooks/network-graphs/'> https://plotly.com/ipython-notebooks/network-graphs/</a>",
-                    showarrow=False,
-                    xref="paper", yref="paper",
-                    x=0.005, y=-0.002 ) ],
-                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
-                )
-        fig.show()
-
 class TakeNN:
 
     def __init__(self, train_feature, train_target, dims, num_epochs, batch_size, model_settings=None):
@@ -425,7 +334,7 @@ class TakeNN:
         self.threshold = None
     
     def copy(self):
-        new_object = self.__class__(self.features, self.target, 1, self.num_epochs, self.batch_size, model_settings=self.model_settings)
+        new_object = self.__class__(self.features, self.target, 1, self.num_epochs, self.batch_size, model_settings=deepcopy(self.model_settings))
         new_object.threshold = deepcopy(self.threshold)
         # new_object.model_settings = deepcopy(self.model_settings)
         # new_object.features = deepcopy(self.features)
@@ -525,3 +434,89 @@ class TakeNN:
         #         loss += lmd * tensor(add_loss[0, 0])
         #     except:
         #         loss += lmd * tensor(add_loss)
+    
+
+class IsolateGraph:
+    def __init__(self, data, colors, graph):
+        self.structure = {}
+        self.eds = euclidean_distances(data, data)
+        for i in range(len(data)):
+            self.structure[i] = {
+                "orig_pos": data[i],
+                "neighbours": graph[i],
+                "marker": colors[i]
+            }
+
+    @staticmethod
+    @njit
+    def get_started_point(graph_neigh):
+        choose = None
+        temp = None
+        for i, neigh in enumerate(graph_neigh):
+            if choose is None or len(neigh) > temp:
+                choose = i
+                temp = len(neigh)
+        
+        return choose
+    
+    def dijkstra(self, nodes):
+        while len(nodes) > 0:
+            node_index = nodes.pop(0)
+            node = self.structure[node_index]
+            for next_node_index in node["neighbours"]:
+                next_node = self.structure[next_node_index]
+                # if next_node.min_distance is not None and next_node.min_distance == 0:
+                #     continue
+                their_edge = self.eds[node][next_node_index]
+                if next_node.get("min_distance", None) is None or next_node["min_distance"] > node["min_distance"] + their_edge:
+                    self.structure[next_node_index]["min_distance"] = node["min_distance"] + their_edge
+                    self.structure[next_node_index]["from_node"] = node_index
+                
+                if not next_node.get("visit", None):
+                    nodes.append(next_node_index)
+            self.structure[node_index]["visit"] = True
+
+    def get_data_for_pca(self, from_choose_node):
+        result = [from_choose_node["params"]]
+        colors = [from_choose_node["color"]]
+        for neigh in self.neighbors(from_choose_node["name"]):
+            result.append(self.nodes[neigh]["params"])
+            colors.append(self.nodes[neigh]["color"])
+            self.nodes[neigh]["transform"] = True
+        from_choose_node["transform"] = True
+        
+        return result, colors
+    
+    def set_new_params(self, from_choosen_node, pca_params):
+        from_choosen_node["new_params"] = pca_params[0]
+        index_neighbors = list(self.neighbors(from_choosen_node["name"]))
+        for i, params in enumerate(pca_params):
+            if i == 0:
+                continue
+            self.nodes[index_neighbors[i - 1]]["new_params"] = params
+
+    def find_raw_params(self, pca, center=None):
+        for node_index in self.nodes:
+            node = self.nodes[node_index]
+            params = (node["params"] - self.avg) / self.var
+            res = pca.transform([params])
+            self.nodes[node_index]["raw_params"] = res[0]
+
+    def transform_nodes(self, nodes, result, choosen_node):
+        return_nodes = []
+        while len(nodes) > 0:
+            from_node, nodes = self.find_node_from(nodes)
+            if from_node is None:
+                nodes = []
+                continue
+            transform_nodes = self.find_all_next_nodes(from_node)
+            if len(transform_nodes) == 0:
+                continue
+            # self.test_transform(transform_nodes)
+            self.transform_part(transform_nodes)
+
+            nodes.extend(transform_nodes)
+            return_nodes.extend(transform_nodes)
+        
+        return return_nodes
+

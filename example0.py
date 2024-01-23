@@ -330,7 +330,9 @@ def run_experiment_regression(base_model, test_feature, test_target, number):
     base_model.train()
     result1 = base_model.model_settings['model'](test_feature)
     result1 = result1.detach().numpy()
+    runner.save_end_graph(data=result1, name=f"raw_result1_{number}.txt")
     result1 = result1.round().astype("int64")
+    runner.save_end_graph(data=result1, name=f"result1_{number}.txt")
 
     metric_nn_1 = mean_squared_error(test_target.reshape(-1), result1.reshape(-1))
 
@@ -341,12 +343,14 @@ def run_experiment_regression(base_model, test_feature, test_target, number):
 
     result2 = population.base_model.model_settings['model'](test_feature)
     result2 = result2.detach().numpy()
+    runner.save_end_graph(data=result2, name=f"raw_result2_{number}.txt")
     result2 = result2.round().astype("int64")
+    runner.save_end_graph(data=result2, name=f"result2_{number}.txt")
 
     metric_nn_2 = mean_squared_error(test_target.reshape(-1), result2.reshape(-1))
 
-    runner.save_plots(name=f"result_{number}", data=[test_target.reshape(-1), result1.reshape(-1), result2.reshape(-1)], labels=["target", "base", "man"])
-    runner.save_plots(name=f"dif_result_{number}", data=[abs(test_target.reshape(-1) - result1.reshape(-1)), abs(test_target.reshape(-1) - result2.reshape(-1))], labels=["dif_base", "dif_man"])
+    # runner.save_plots(name=f"result_{number}", data=[test_target.reshape(-1), result1.reshape(-1), result2.reshape(-1)], labels=["target", "base", "man"])
+    # runner.save_plots(name=f"dif_result_{number}", data=[abs(test_target.reshape(-1) - result1.reshape(-1)), abs(test_target.reshape(-1) - result2.reshape(-1))], labels=["dif_base", "dif_man"])
     runner.save_plot(f"fitness_{number}", population.change_fitness)
     runner.save_model(f"model_{number}", population.base_model.model_settings['model'])
 
@@ -402,6 +406,7 @@ def main(data: Union[str, np.ndarray]):
         boxplot_data.append(result['f1_score'])
 
     runner.save_boxplot("boxplot", boxplot_data)
+    runner.save_end_graph(test_target, name="target.txt")
 
     # population = PopulationGraph(iterations=15)
     # population.evolutionary()

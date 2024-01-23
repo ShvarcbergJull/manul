@@ -15,6 +15,6 @@ class InitPopulation(GeneticOperatorPopulation):
             if _ > 0:
                 new_individ.apply_operator('MutationIndivid', mut_intensive=np.random.choice(np.arange(1, 6)))
             population.structure.append(new_individ)
-        self.params['base_model'].train()
-        population.base_model = self.params['base_model']
+        population.base_model = self.params['base_model'].copy()
+        population.base_model.train()
         return population
