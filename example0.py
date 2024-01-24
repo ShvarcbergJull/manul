@@ -280,15 +280,40 @@ def mammonth_example():
     import ast
     fl = open("data/mammoth_3d.json ", "r")
     data = fl.read()
-    data.ast.literal_eval(data)
+    data = ast.literal_eval(data)
 
     data = np.array(data)
     N = len(data)
     colors = np.linspace(0, 0.9, N)
 
     data = np.array(sorted(data, key=lambda parameters: parameters[2]))
+    new_data = []
+    new_colors = []
 
-    return data, colors
+    for i, dt in enumerate(data):
+        if i % 2 != 0:
+            continue
+        new_data.append(dt)
+        new_colors.append(colors[i])
+
+    data = []
+    colors = []
+
+    temp_data = []
+    temp_colors = []
+
+    for i, dat in enumerate(new_data):
+        if i % 2 != 0:
+            temp_data.append(dat)
+            temp_colors.append(new_colors[i])
+        else:
+            data.append(dat)
+            colors.append(new_colors[i])
+
+    colors.extend(temp_colors)
+    data.extend(temp_data)
+
+    return np.array(data), np.array(colors)
 
 
 def run_experiment(base_model, test_feature, test_target, number):
@@ -368,13 +393,14 @@ def main(data: Union[str, np.ndarray]):
     # feature, target = expe_water()
     # feature, target = exp_airlines()
     feature, target = wine_example()
+    # feature, target = mammonth_example()
     # feature = data[:, :-1]
     # target = data[:, -1]
     train_feature, train_target, test_feature, test_target, dims = handler_of_data(feature, target)
     print(train_feature.shape)
 
     logging.info("Creating base individ...")
-    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), graph_file="Info_log/graph_wine.txt", n_neighbors=20, eps=0.25)
+    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), n_neighbors=20, eps=0.10)
     base_model = TakeNN(train_feature, train_target, dims=dims, num_epochs=30, batch_size=500)
     logging.info("Creating map with operators and population")
 
