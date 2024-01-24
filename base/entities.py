@@ -19,6 +19,7 @@ from torch import randperm, tensor, mean, sqrt
 from torch.optim import Adam
 from torch import float64 as fl64
 from sklearn.metrics import f1_score, roc_auc_score, mean_squared_error
+from scipy.optimize import minimize
 
 
 @njit
@@ -334,7 +335,7 @@ class TakeNN:
         self.threshold = None
     
     def copy(self):
-        new_object = self.__class__(self.features, self.target, 1, self.num_epochs, self.batch_size, model_settings=deepcopy(self.model_settings))
+        new_object = self.__class__(self.features, self.target, 1, self.num_epochs, self.batch_size, model_settings=self.model_settings)
         new_object.threshold = deepcopy(self.threshold)
         # new_object.model_settings = deepcopy(self.model_settings)
         # new_object.features = deepcopy(self.features)
@@ -347,7 +348,7 @@ class TakeNN:
     def train(self, add_loss_func=None, graph=None, val=1):
         self.model_settings["model"].train()
         min_loss, t = np.inf, 0
-        lmd = 1/((self.batch_size - 100) ** 2)
+        lmd = 1/((self.batch_size) ** 2)
         epoch = 0
         end = False
         last_loss = None
@@ -439,16 +440,38 @@ class TakeNN:
 class IsolateGraph:
     def __init__(self, data, colors, graph):
         self.structure = {}
+        self.avg = []
+        self.var = []
+        i = 0
+
+        while i < len(data[0]):
+            variance = np.var(data[:, i])
+            if variance == 0:
+                data = np.delete(data, i, 1)
+                continue
+            self.avg.append(np.average(data[:, i]))
+            self.var.append(variance)
+            i += 1
+
         self.eds = euclidean_distances(data, data)
         for i in range(len(data)):
             self.structure[i] = {
+                "name": i,
                 "orig_pos": data[i],
                 "neighbours": graph[i],
                 "marker": colors[i]
             }
 
     @staticmethod
-    @njit
+    def _fitness_wrapper(params, *args):
+        A, all_cos = args
+        parametr = np.dot(A, params) - all_cos.T
+        parameter = IsolateGraph.find_norma(parametr)
+
+        return  parameter ** 2
+
+    @staticmethod
+    # @njit
     def get_started_point(graph_neigh):
         choose = None
         temp = None
@@ -467,7 +490,7 @@ class IsolateGraph:
                 next_node = self.structure[next_node_index]
                 # if next_node.min_distance is not None and next_node.min_distance == 0:
                 #     continue
-                their_edge = self.eds[node][next_node_index]
+                their_edge = self.eds[node_index][next_node_index]
                 if next_node.get("min_distance", None) is None or next_node["min_distance"] > node["min_distance"] + their_edge:
                     self.structure[next_node_index]["min_distance"] = node["min_distance"] + their_edge
                     self.structure[next_node_index]["from_node"] = node_index
@@ -477,32 +500,31 @@ class IsolateGraph:
             self.structure[node_index]["visit"] = True
 
     def get_data_for_pca(self, from_choose_node):
-        result = [from_choose_node["params"]]
-        colors = [from_choose_node["color"]]
-        for neigh in self.neighbors(from_choose_node["name"]):
-            result.append(self.nodes[neigh]["params"])
-            colors.append(self.nodes[neigh]["color"])
-            self.nodes[neigh]["transform"] = True
-        from_choose_node["transform"] = True
+        result = [self.structure[from_choose_node]['orig_pos']]
+        for neigh in self.structure[from_choose_node]["neighbours"]:
+            result.append(self.structure[neigh]["orig_pos"])
+            self.structure[neigh]["transform"] = True
+        self.structure[from_choose_node]["transform"] = True
         
-        return result, colors
+        return np.array(result)
     
     def set_new_params(self, from_choosen_node, pca_params):
-        from_choosen_node["new_params"] = pca_params[0]
-        index_neighbors = list(self.neighbors(from_choosen_node["name"]))
+        self.structure[from_choosen_node]["tr_pos"] = pca_params[0]
+        index_neighbors = self.structure[from_choosen_node]['neighbours']
         for i, params in enumerate(pca_params):
             if i == 0:
                 continue
-            self.nodes[index_neighbors[i - 1]]["new_params"] = params
+            self.structure[index_neighbors[i - 1]]["tr_pos"] = params
 
     def find_raw_params(self, pca, center=None):
-        for node_index in self.nodes:
-            node = self.nodes[node_index]
-            params = (node["params"] - self.avg) / self.var
+        for node_index in self.structure:
+            node = self.structure[node_index]
+            params = (node["orig_pos"] - self.avg) / self.var
             res = pca.transform([params])
-            self.nodes[node_index]["raw_params"] = res[0]
+            self.structure[node_index]["raw_pos"] = res[0]
+            self.structure[node_index]["tr_pos"] = res[0]
 
-    def transform_nodes(self, nodes, result, choosen_node):
+    def transform_nodes(self, nodes):
         return_nodes = []
         while len(nodes) > 0:
             from_node, nodes = self.find_node_from(nodes)
@@ -519,4 +541,66 @@ class IsolateGraph:
             return_nodes.extend(transform_nodes)
         
         return return_nodes
+    
+    def find_node_from(self, nodes):
+        max_trans = 0
+        result_node = None
 
+        for nn in nodes:
+            your_neighs = list(filter(lambda x_node: self.structure[x_node].get("transform", False), self.structure[nn]['neighbours']))
+            if len(your_neighs) > max_trans:
+                max_trans = len(your_neighs)
+                result_node = nn
+        
+        try:
+            tr = nodes.remove(result_node)
+        except Exception as e:
+            print("there are transform all")
+        return result_node, nodes
+    
+    def find_all_next_nodes(self, from_node):
+        result_nodes = []
+        for node_index in self.structure:
+            node = self.structure[node_index]
+            if node.get("from_node", None) is not None and node["from_node"] == from_node and not node.get("transform", None):
+                result_nodes.append(node_index)
+        
+        result_nodes = sorted(result_nodes, key=lambda x_node: self.structure[x_node]["min_distance"])
+        return result_nodes
+    
+    def transform_part(self, nodes):
+        for node_index in nodes:
+            all_results = []
+            rows = []
+
+            node = self.structure[node_index]
+            from_node = self.structure[node["from_node"]]
+            a = node["orig_pos"] - from_node["orig_pos"]
+            norm_of_a = IsolateGraph.find_norma(node["raw_pos"] - from_node["raw_pos"])
+
+            for neigh_node_index in from_node["neighbours"]:
+                if not self.structure[neigh_node_index].get("transform", None):
+                    continue
+
+                b = self.structure[neigh_node_index]["orig_pos"] - from_node["orig_pos"]
+                current_cos = np.dot(a, b) / (IsolateGraph.find_norma(a) * IsolateGraph.find_norma(b))
+                all_results.append(current_cos)
+                diff = self.structure[neigh_node_index]["tr_pos"] - from_node["tr_pos"]
+                row = diff.T / (norm_of_a * IsolateGraph.find_norma(diff))
+                rows.append(row)
+            x0 = from_node["tr_pos"]
+            cons = ({'type': 'eq',
+                'fun' : lambda x: IsolateGraph.find_norma(x) - norm_of_a})
+            res = minimize(self._fitness_wrapper, x0.reshape(-1), args=(np.array(rows), np.array(all_results)), method='SLSQP', constraints=cons)
+            self.structure[node_index]["tr_pos"] = res.x + from_node["tr_pos"]
+            self.structure[node_index]["transform"] = True
+
+
+    @staticmethod
+    @njit
+    def find_norma(params):
+        result = 0
+        for param in params:
+            result += np.power(param, 2)
+        
+        return np.sqrt(result)
