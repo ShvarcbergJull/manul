@@ -276,6 +276,15 @@ def wine_example():
 
     return features, target
 
+def airfoil_exmpl():
+    import pandas as pd
+    df = pd.read_csv("data/AirfoilSelfNoise.csv")
+    features = df[df.keys()[:-1]].to_numpy()
+    target = df[df.keys()[-1]].to_numpy()
+
+    return features, target
+
+
 def mammonth_example():
     import ast
     fl = open("data/mammoth_3d.json ", "r")
@@ -392,16 +401,17 @@ def main(data: Union[str, np.ndarray]):
     # feature, target = exp_real_data3()
     # feature, target = expe_water()
     # feature, target = exp_airlines()
-    feature, target = wine_example()
+    # feature, target = wine_example()
     # feature, target = mammonth_example()
+    feature, target = airfoil_exmpl()
     # feature = data[:, :-1]
     # target = data[:, -1]
     train_feature, train_target, test_feature, test_target, dims = handler_of_data(feature, target)
     print(train_feature.shape)
 
     logging.info("Creating base individ...")
-    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), n_neighbors=20, eps=0.10)
-    base_model = TakeNN(train_feature, train_target, dims=dims, num_epochs=30, batch_size=500)
+    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), n_neighbors=20, eps=0.05)
+    base_model = TakeNN(train_feature, train_target, dims=dims, num_epochs=30, batch_size=300)
     logging.info("Creating map with operators and population")
 
     build_settings = {
@@ -427,7 +437,7 @@ def main(data: Union[str, np.ndarray]):
     boxplot_data = []
 
     for i in range(10):
-        new_model = TakeNN(train_feature, train_target, dims=dims, num_epochs=30, batch_size=500)
+        new_model = TakeNN(train_feature, train_target, dims=dims, num_epochs=30, batch_size=300)
         result = run_experiment_regression(new_model, test_feature, test_target, i)
         boxplot_data.append(result['f1_score'])
 

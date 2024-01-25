@@ -284,8 +284,8 @@ class PopulationGraph(Population):
             bar.next()
         for individ in self.structure:
             if individ.elitism == True:
-                self.base_model = individ.model.copy()
-                self.laplassian = individ.laplassian
+                # self.base_model = individ.model.copy()
+                # self.laplassian = individ.laplassian
                 individ.save_end_graph(num)
                 break
         bar.finish()

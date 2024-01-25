@@ -44,6 +44,54 @@ def wine_example():
 
     return features, target
 
+def mammonth_example():
+    import ast
+    fl = open("data/mammoth_3d.json ", "r")
+    data = fl.read()
+    data = ast.literal_eval(data)
+
+    data = np.array(data)
+    N = len(data)
+    colors = np.linspace(0, 0.9, N)
+
+    data = np.array(sorted(data, key=lambda parameters: parameters[2]))
+    new_data = []
+    new_colors = []
+
+    for i, dt in enumerate(data):
+        if i % 2 != 0:
+            continue
+        new_data.append(dt)
+        new_colors.append(colors[i])
+
+    data = []
+    colors = []
+
+    temp_data = []
+    temp_colors = []
+
+    for i, dat in enumerate(new_data):
+        if i % 2 != 0:
+            temp_data.append(dat)
+            temp_colors.append(new_colors[i])
+        else:
+            data.append(dat)
+            colors.append(new_colors[i])
+
+    colors.extend(temp_colors)
+    data.extend(temp_data)
+
+    return np.array(data), np.array(colors)
+
+
+def airfoil_exmpl():
+    import pandas as pd
+    df = pd.read_csv("data/AirfoilSelfNoise.csv")
+    features = df[df.keys()[:-1]].to_numpy()
+    target = df[df.keys()[-1]].to_numpy()
+
+    return features, target
+
 def draw(graph: IsolateGraph):
     edges=[]
     for edge in graph.structure:
@@ -51,14 +99,14 @@ def draw(graph: IsolateGraph):
         for neig in graph.structure[edge]['neighbours']:
             edges.append(pos1)
             edges.append(graph.structure[neig]['tr_pos'])
-            edges.append([None, None])
+            edges.append([None, None, None])
     
     edges = np.array(edges).T
-    edge_trace = go.Scatter(x=edges[0], y=edges[1], line=dict(width=4, color='#888'), hoverinfo='none', mode='lines')
+    edge_trace = go.Scatter3d(x=edges[0], y=edges[1], z=edges[2], line=dict(width=4, color='#888'), hoverinfo='none', mode='lines')
     
     nodes = np.array([graph.structure[node]['tr_pos'] for node in graph.structure]).T
     colors = np.array([graph.structure[node]['marker'] for node in graph.structure])
-    node_trace = go.Scatter(x=nodes[0], y=nodes[1], mode='markers', hoverinfo='text',
+    node_trace = go.Scatter3d(x=nodes[0], y=nodes[1], z=nodes[2], mode='markers', hoverinfo='text',
                                 marker=dict(
                                     showscale=True,
                                     # colorscale options
@@ -96,9 +144,10 @@ def draw(graph: IsolateGraph):
 
 
 if __name__ == "__main__":
-    feature, target = wine_example()
+    feature, target = airfoil_exmpl()
+    # feature, target = mammonth_example()
     train_feature, train_target, test_feature, test_target, dims = handler_of_data(feature, target)
-    graph = open("Info_log\\2024_01_23-05_03_18_PM\\graph_1.txt", "r")
+    graph = open("Info_log/2024_01_25-05_06_45_PM/graph_0.txt", "r")
     graph = ast.literal_eval(graph.read())
 
     my_object = IsolateGraph(data=train_feature.detach().numpy(), colors=train_target.detach().numpy(), graph=graph)
@@ -110,7 +159,7 @@ if __name__ == "__main__":
 
     print("PCA")
     fit_data = my_object.get_data_for_pca(index_point)
-    pca = PCA(n_components=2)
+    pca = PCA(n_components=3)
     pca.fit(fit_data)
     result = pca.transform(fit_data)
     my_object.set_new_params(index_point, result)
