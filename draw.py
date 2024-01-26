@@ -40,6 +40,55 @@ def wine_example():
 
     return features, target
 
+def mammonth_example():
+    import ast
+    fl = open("data/mammoth_3d.json ", "r")
+    data = fl.read()
+    data = ast.literal_eval(data)
+
+    data = np.array(data)
+    N = len(data)
+    colors = np.linspace(0, 0.9, N)
+
+    data = np.array(sorted(data, key=lambda parameters: parameters[2]))
+    new_data = []
+    new_colors = []
+
+    for i, dt in enumerate(data):
+        if i % 3 != 0:
+            continue
+        new_data.append(dt)
+        new_colors.append(colors[i])
+
+    data = []
+    colors = []
+
+    temp_data = []
+    temp_colors = []
+
+    for i, dat in enumerate(new_data):
+        if i % 2 != 0:
+            temp_data.append(dat)
+            temp_colors.append(new_colors[i])
+        else:
+            data.append(dat)
+            colors.append(new_colors[i])
+
+    colors.extend(temp_colors)
+    data.extend(temp_data)
+
+    return np.array(data), np.array(colors)
+
+def airfoil_exmpl():
+    import pandas as pd
+    df = pd.read_csv("data/AirfoilSelfNoise.csv")
+    features = df[df.keys()[:-1]].to_numpy()
+    target = df[df.keys()[-1]].to_numpy()
+
+    print(len(features))
+
+    return features, target
+
 def handler_of_data(feature, target):
     # dims = len(feature.keys())
     dims = feature.shape[-1]
@@ -62,19 +111,27 @@ def handler_of_data(feature, target):
     return train_features, train_target, test_features, test_target, dims
 
 if __name__ == "__main__":
-    feature, target = wine_example()
+    feature, target = airfoil_exmpl()
     train_feature, train_target, test_feature, test_target, dims = handler_of_data(feature, target)
     N = len(test_feature)
+
+    print(len(train_feature), len(test_target))
+
+
+    # test_target = open(f"C:\\Users\\User\\Desktop\\ntcv\\manul\\results\\mammoth\\target.txt", "r")
+    # test_target = np.array(ast.literal_eval(test_target.read()))
 
     res1 = []
     res2 = []
     val = []
 
-    for i in range(9):
-        raw_res = open(f"C:\\Users\\User\\Desktop\\ntcv\manul\\Info_log\\2024_01_25-02_26_36_PM\\result1_{i}.txt", "r")
-        raw_res = np.array(ast.literal_eval(raw_res.read()))
-        res = open(f"C:\\Users\\User\\Desktop\\ntcv\manul\\Info_log\\2024_01_25-02_26_36_PM\\result2_{i}.txt", "r")
-        res = np.array(ast.literal_eval(res.read()))
+    for i in range(10):
+        raw_res = open(f"Info_log\\2024_01_26-02_13_46_PM\\raw_result1_{i}.txt", "r")
+        raw_res = raw_res.read().replace("\n", ", ")
+        raw_res = np.array(ast.literal_eval(raw_res))
+        res = open(f"Info_log\\2024_01_26-02_13_46_PM\\raw_result2_{i}.txt", "r")
+        res = res.read().replace("\n", ", ")
+        res = np.array(ast.literal_eval(res))
 
         res1.extend(abs(raw_res.reshape(-1) - test_target.detach().numpy()))
         res2.extend(abs(res.reshape(-1) - test_target.detach().numpy()))
@@ -83,13 +140,13 @@ if __name__ == "__main__":
     res1 = np.array(res1)
     res2 = np.array(res2)
     import pandas as pd
-    df1 = pd.DataFrame({'num': val, 
-                        'value': res1, 
-                        'type': 'start'})
+    df1 = pd.DataFrame({'Experiment': val, 
+                        'Prediction Absolut Error': res1, 
+                        'Model': 'base'})
     
-    df2 = pd.DataFrame({'num': val, 
-                        'value': res2, 
-                        'type': 'end'})
+    df2 = pd.DataFrame({'Experiment': val, 
+                        'Prediction Absolut Error': res2, 
+                        'Model': 'EA'})
     
     df_aggreg = pd.concat([df1, df2], axis = 0)
 
@@ -103,13 +160,13 @@ if __name__ == "__main__":
     px.defaults.width = 600
     px.defaults.height = 500
 
-    fig = px.box(df_aggreg, x="num", y="value", color="type")
+    fig = px.box(df_aggreg, x="Experiment", y="Prediction Absolut Error", color="Model")
     fig.update_traces(quartilemethod="linear") # or "inclusive", or "linear" by default
     fig.update_layout(
         xaxis = dict(
             tickmode = 'array',
-            tickvals = [i for i in range(1, 10)],
-            ticktext = [i for i in range(1, 10)]
+            tickvals = [i for i in range(1, 11)],
+            ticktext = [i for i in range(1, 11)]
         )
     )
 
@@ -126,8 +183,6 @@ if __name__ == "__main__":
         legend_title_font_color="black",
         legend_title_font_size=18
     )
-    fig.write_image('SG_sharepart_ode.png', scale=3)
+    fig.write_image('boxplot_error_mammoth.png', scale=3)
 
     fig.show()
-
-    

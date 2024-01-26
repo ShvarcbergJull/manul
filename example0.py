@@ -410,7 +410,7 @@ def main(data: Union[str, np.ndarray]):
     print(train_feature.shape)
 
     logging.info("Creating base individ...")
-    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), n_neighbors=20, eps=0.05)
+    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), n_neighbors=20, eps=0.20)
     base_model = TakeNN(train_feature, train_target, dims=dims, num_epochs=30, batch_size=300)
     logging.info("Creating map with operators and population")
 

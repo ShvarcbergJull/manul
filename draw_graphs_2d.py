@@ -59,7 +59,7 @@ def mammonth_example():
     new_colors = []
 
     for i, dt in enumerate(data):
-        if i % 2 != 0:
+        if i % 3 != 0:
             continue
         new_data.append(dt)
         new_colors.append(colors[i])
@@ -95,16 +95,16 @@ def airfoil_exmpl():
 def draw(graph: IsolateGraph):
     edges=[]
     for edge in graph.structure:
-        pos1 = graph.structure[edge]['tr_pos']
+        pos1 = graph.structure[edge]['orig_pos']
         for neig in graph.structure[edge]['neighbours']:
             edges.append(pos1)
-            edges.append(graph.structure[neig]['tr_pos'])
+            edges.append(graph.structure[neig]['orig_pos'])
             edges.append([None, None, None])
     
     edges = np.array(edges).T
     edge_trace = go.Scatter3d(x=edges[0], y=edges[1], z=edges[2], line=dict(width=4, color='#888'), hoverinfo='none', mode='lines')
     
-    nodes = np.array([graph.structure[node]['tr_pos'] for node in graph.structure]).T
+    nodes = np.array([graph.structure[node]['orig_pos'] for node in graph.structure]).T
     colors = np.array([graph.structure[node]['marker'] for node in graph.structure])
     node_trace = go.Scatter3d(x=nodes[0], y=nodes[1], z=nodes[2], mode='markers', hoverinfo='text',
                                 marker=dict(
@@ -125,7 +125,7 @@ def draw(graph: IsolateGraph):
                                 ),
                                 line_width=2))
     
-    fig = go.Figure(data=[edge_trace, node_trace],
+    fig = go.Figure(data=[node_trace],
              layout=go.Layout(
                 title='<br>Network graph made with Python',
                 titlefont_size=16,
@@ -147,7 +147,7 @@ if __name__ == "__main__":
     feature, target = airfoil_exmpl()
     # feature, target = mammonth_example()
     train_feature, train_target, test_feature, test_target, dims = handler_of_data(feature, target)
-    graph = open("Info_log/2024_01_25-05_06_45_PM/graph_0.txt", "r")
+    graph = open("Info_log\\2024_01_26-02_13_46_PM\\graph.txt", "r")
     graph = ast.literal_eval(graph.read())
 
     my_object = IsolateGraph(data=train_feature.detach().numpy(), colors=train_target.detach().numpy(), graph=graph)

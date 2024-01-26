@@ -21,3 +21,7 @@ https://www.kaggle.com/datasets/uciml/red-wine-quality-cortez-et-al-2009
 # electricity-normalized
 
 https://www.kaggle.com/datasets/vstacknocopyright/electricity
+
+# AirfoilSelfNoise.csv
+
+https://www.kaggle.com/datasets/fedesoriano/airfoil-selfnoise-dataset
