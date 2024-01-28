@@ -83,8 +83,9 @@ class DataStructureGraph(Individ):
             self.find_ED(eps, data)
             temp_edges = forming_dict(self.graph, self.matrix_connect)
             start_node_index = self.choosing_start_node()
-            res, delete_edges = DataStructureGraph.check_visible_neigh(data, temp_edges, [start_node_index])
+            res, delete_edges = chekkk(data, temp_edges, [start_node_index])
             runner.save_graph(res)
+            self.name_gr = f"{runner.get_path()}/graph.txt"
             self.local_remove(delete_edges)
         else:
             self.kernel = tp.tpgraph.Kernel(n_neighbors=n_neighbors, n_jobs=1, metric='cosine', fuzzy=True, verbose=True)
@@ -458,7 +459,7 @@ class IsolateGraph:
             self.structure[i] = {
                 "name": i,
                 "orig_pos": data[i],
-                "neighbours": graph[i],
+                "neighbours": [edge[1] for edge in graph.edges(i)],
                 "marker": colors[i]
             }
 

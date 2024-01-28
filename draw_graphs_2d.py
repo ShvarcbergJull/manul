@@ -95,18 +95,24 @@ def airfoil_exmpl():
 def draw(graph: IsolateGraph):
     edges=[]
     for edge in graph.structure:
-        pos1 = graph.structure[edge]['orig_pos']
+        pos1 = graph.structure[edge]['tr_pos']
+        # if pos1[0] > 100:
+        #     continue
         for neig in graph.structure[edge]['neighbours']:
+            # if graph.structure[neig]['tr_pos'][0] > 100:
+            #     continue
             edges.append(pos1)
-            edges.append(graph.structure[neig]['orig_pos'])
-            edges.append([None, None, None])
+            edges.append(graph.structure[neig]['tr_pos'])
+            edges.append([None, None])
     
     edges = np.array(edges).T
-    edge_trace = go.Scatter3d(x=edges[0], y=edges[1], z=edges[2], line=dict(width=4, color='#888'), hoverinfo='none', mode='lines')
+    print(edges.shape)
+    edge_trace = go.Scatter(x=edges[0], y=edges[1], line=dict(width=4, color='#888'), hoverinfo='none', mode='lines')
     
-    nodes = np.array([graph.structure[node]['orig_pos'] for node in graph.structure]).T
+    nodes = np.array([graph.structure[node]['tr_pos'] for node in graph.structure]).T
     colors = np.array([graph.structure[node]['marker'] for node in graph.structure])
-    node_trace = go.Scatter3d(x=nodes[0], y=nodes[1], z=nodes[2], mode='markers', hoverinfo='text',
+    print(nodes.shape)
+    node_trace = go.Scatter(x=nodes[0], y=nodes[1], mode='markers', hoverinfo='text',
                                 marker=dict(
                                     showscale=True,
                                     # colorscale options
@@ -125,7 +131,7 @@ def draw(graph: IsolateGraph):
                                 ),
                                 line_width=2))
     
-    fig = go.Figure(data=[node_trace],
+    fig = go.Figure(data=[edge_trace, node_trace],
              layout=go.Layout(
                 title='<br>Network graph made with Python',
                 titlefont_size=16,
@@ -140,26 +146,37 @@ def draw(graph: IsolateGraph):
                 xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                 yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
                 )
-    fig.show()
+    fig.write_html("air_base.html")
+    # fig.show()
 
 
 if __name__ == "__main__":
     feature, target = airfoil_exmpl()
     # feature, target = mammonth_example()
     train_feature, train_target, test_feature, test_target, dims = handler_of_data(feature, target)
-    graph = open("Info_log\\2024_01_26-02_13_46_PM\\graph.txt", "r")
+    graph = open("results\\airflou\\graph.txt", "r")
     graph = ast.literal_eval(graph.read())
 
-    my_object = IsolateGraph(data=train_feature.detach().numpy(), colors=train_target.detach().numpy(), graph=graph)
+    import networkx as nx
+    net_graph = nx.Graph()
+
+    for i, val in enumerate(graph):
+        for j in val:
+            if i == j:
+                continue
+            net_graph.add_edge(i, j)
+
+    my_object = IsolateGraph(data=train_feature.detach().numpy(), colors=train_target.detach().numpy(), graph=net_graph)
     index_point = IsolateGraph.get_started_point(graph_neigh=graph)
 
     my_object.structure[index_point]['min_distance'] = 0
     my_object.structure[index_point]['from_node'] = None
+    print("DEJKSTRA")
     my_object.dijkstra([index_point])
 
     print("PCA")
     fit_data = my_object.get_data_for_pca(index_point)
-    pca = PCA(n_components=3)
+    pca = PCA(n_components=2)
     pca.fit(fit_data)
     result = pca.transform(fit_data)
     my_object.set_new_params(index_point, result)

@@ -123,6 +123,9 @@ class ProgramRun(metaclass=SingletonClass):
     def load_model(self, name):
         the_model = torch.load(name)
         return the_model
+    
+    def get_path(self):
+        return self.name_of_dir
 
 
 class GeneticOperatorIndivid(GeneticOperator):
