@@ -5,7 +5,8 @@ import ast
 import numpy as np
 from progress.bar import Bar
 from numba.typed import Dict
-from numba import njit, float64, int64
+import numba.types as tp
+from numba import njit, float64, int64, int32
 from datetime import datetime
 from copy import deepcopy
 from functools import singledispatchmethod
@@ -455,13 +456,21 @@ class IsolateGraph:
             i += 1
 
         self.eds = euclidean_distances(data, data)
+        self.neighbours = Dict.empty(key_type=int64, value_type=int32[:])
         for i in range(len(data)):
+            neigh = []
+            for edge in graph.edges(i):
+                if edge[1] < i:
+                    if i in self.structure[edge[1]]['neighbours']:
+                        continue
+                neigh.append(edge[1])
             self.structure[i] = {
                 "name": i,
                 "orig_pos": data[i],
-                "neighbours": [edge[1] for edge in graph.edges(i)],
+                "neighbours": neigh,
                 "marker": colors[i]
             }
+            self.neighbours[i] = np.asarray([edge[1] for edge in graph.edges(i)])
 
     @staticmethod
     def _fitness_wrapper(params, *args):
@@ -483,22 +492,52 @@ class IsolateGraph:
         
         return choose
     
-    def dijkstra(self, nodes):
+    @staticmethod
+    @njit
+    def fastik(neighbours, nodes, eds):
+        min_distance = np.array([-1 for _ in range(len(neighbours))])
+        from_node = np.array([0 for _ in range(len(neighbours))])
+        visit = np.array([False for _ in range(len(neighbours))])
+        min_distance[nodes[0]] = 0
         while len(nodes) > 0:
-            node_index = nodes.pop(0)
-            node = self.structure[node_index]
-            for next_node_index in node["neighbours"]:
-                next_node = self.structure[next_node_index]
+            node_index, nodes = nodes[0], nodes[1:]
+            # node = self.structure[node_index]
+            for next_node_index in neighbours[node_index]:
+                # next_node = coord[next_node_index]
                 # if next_node.min_distance is not None and next_node.min_distance == 0:
                 #     continue
-                their_edge = self.eds[node_index][next_node_index]
-                if next_node.get("min_distance", None) is None or next_node["min_distance"] > node["min_distance"] + their_edge:
-                    self.structure[next_node_index]["min_distance"] = node["min_distance"] + their_edge
-                    self.structure[next_node_index]["from_node"] = node_index
+                their_edge = eds[node_index][next_node_index]
+                if min_distance[next_node_index] == -1 or min_distance[next_node_index] > min_distance[node_index] + their_edge:
+                    min_distance[next_node_index] = min_distance[node_index] + their_edge
+                    from_node[next_node_index] = node_index
                 
-                if not next_node.get("visit", None):
-                    nodes.append(next_node_index)
-            self.structure[node_index]["visit"] = True
+                if not visit[next_node_index]:
+                    np.append(nodes, next_node_index)
+            visit[node_index] = True
+
+        return from_node, min_distance
+
+
+    def dijkstra(self, nodes):
+        from_nodes, min_d = IsolateGraph.fastik(self.neighbours, np.array(nodes), self.eds)
+        for i, value in enumerate(from_nodes):
+            self.structure[i]["from_node"] = value
+            self.structure[i]["min_distance"] = min_d[i]
+        # while len(nodes) > 0:
+        #     node_index = nodes.pop(0)
+        #     node = self.structure[node_index]
+        #     for next_node_index in node["neighbours"]:
+        #         next_node = self.structure[next_node_index]
+        #         # if next_node.min_distance is not None and next_node.min_distance == 0:
+        #         #     continue
+        #         their_edge = self.eds[node_index][next_node_index]
+        #         if next_node.get("min_distance", None) is None or next_node["min_distance"] > node["min_distance"] + their_edge:
+        #             self.structure[next_node_index]["min_distance"] = node["min_distance"] + their_edge
+        #             self.structure[next_node_index]["from_node"] = node_index
+                
+        #         if not next_node.get("visit", None):
+        #             nodes.append(next_node_index)
+        #     self.structure[node_index]["visit"] = True
 
     def get_data_for_pca(self, from_choose_node):
         result = [self.structure[from_choose_node]['orig_pos']]
