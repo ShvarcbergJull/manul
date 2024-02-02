@@ -37,8 +37,11 @@ class FitnessPopulation(GeneticOperatorPopulation):
 
     def apply(self, population, *args, **kwargs):
         for individ in population.structure:
+            if not individ.new_individ:
+                continue
             individ.apply_operator('VarFitnessIndivid', base_model=population.base_model)
             individ.calc_fullness()
+            individ.new_individ = False
         return population
 
 

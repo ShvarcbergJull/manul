@@ -21,6 +21,64 @@ from torch.optim import Adam
 from torch import float64 as fl64
 from sklearn.metrics import f1_score, roc_auc_score, mean_squared_error
 from scipy.optimize import minimize
+from sklearn.decomposition import PCA
+
+
+def draw(graph):
+    edges=[]
+    for edge in graph.structure:
+        pos1 = graph.structure[edge]['orig_pos']
+        # if pos1[0] < -1837.9473415732368:
+        #     continue
+        for neig in graph.structure[edge]['neighbours']:
+            # if graph.structure[neig]['orig_pos'][0] < -1837.9473415732368:
+            #     continue
+            edges.append(pos1)
+            edges.append(graph.structure[neig]['orig_pos'])
+            edges.append([None, None, None])
+    
+    edges = np.array(edges).T
+    print(edges.shape)
+    edge_trace = go.Scatter3d(x=edges[0], y=edges[1], z=edges[2], line=dict(width=0.5, color='#888'), hoverinfo='none', mode='lines')
+    
+    nodes = np.array([graph.structure[node]['orig_pos'] for node in graph.structure]).T
+    colors = np.array([graph.structure[node]['marker'] for node in graph.structure])
+    print(nodes.shape)
+    node_trace = go.Scatter3d(x=nodes[0], y=nodes[1], z=nodes[2], mode='markers', hoverinfo='text',
+                                marker=dict(
+                                    showscale=True,
+                                    # colorscale options
+                                    # #'Greys' | 'YlGnBu' | 'Greens' | 'YlOrRd' | 'Bluered' | 'RdBu' |
+                                    # #'Reds' | 'Blues' | 'Picnic' | 'Rainbow' | 'Portland' | 'Jet' |
+                                    # #'Hot' | 'Blackbody' | 'Earth' | 'Electric' | 'Viridis' |
+                                    colorscale='YlGnBu',
+                                    reversescale=True,
+                                    color=colors,
+                                    size=10,
+                                colorbar=dict(
+                                thickness=15,
+                                title='Node Connections',
+                                xanchor='left',
+                                titleside='right'
+                                ),
+                                line_width=2))
+    
+    fig = go.Figure(data=[edge_trace, node_trace],
+             layout=go.Layout(
+                title='<br>Network graph made with Python',
+                titlefont_size=16,
+                showlegend=False,
+                hovermode='closest',
+                margin=dict(b=20,l=5,r=5,t=40),
+                annotations=[ dict(
+                    text="Python code: <a href='https://plotly.com/ipython-notebooks/network-graphs/'> https://plotly.com/ipython-notebooks/network-graphs/</a>",
+                    showarrow=False,
+                    xref="paper", yref="paper",
+                    x=0.005, y=-0.002 ) ],
+                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
+                )
+    fig.write_html("data_struct.html")
 
 
 @njit
@@ -32,8 +90,8 @@ def chekkk(source_data, res, start_indexs):
         selects[current_index] = 1
         if len(res[current_index]) == 0:
             continue
-        kss = list(res[current_index].keys())[::-1]
-        neigh_indxs = np.array([res[current_index][i] for i in kss])
+        neigh_indxs = np.array(list(res[current_index].keys())[::-1])
+        # neigh_indxs = np.array([res[current_index][i] for i in kss])
         add_params = source_data[neigh_indxs]
         neighbours = source_data[current_index] - add_params
 
@@ -44,7 +102,7 @@ def chekkk(source_data, res, start_indexs):
             neigh_2 = check_this - add_params
             result = np.diag(np.dot(neighbours, neigh_2.T))
             if len(result[result < 0]) > 0:
-                del res[current_index][kss[i]]
+                del res[current_index][elem]
                 rem_edges.append((current_index, elem))
             else:
                 start_indexs.append(elem)
@@ -55,10 +113,13 @@ def forming_dict(graph, eds):
     # res = {}
     res = []
     for i in graph:
-        res.append(Dict.empty(key_type=float64, value_type=int64))
+        res.append(Dict.empty(key_type=int64, value_type=float64))
         # res[i] = {}
-        for k in graph[i]:
-            res[i][eds[i][k]] = k
+        sort_eds = np.argsort(eds[i])
+        current_neih_indexs = filter(lambda ind: ind in graph[i],sort_eds)
+        for k in current_neih_indexs:
+            # res[i][eds[i][k]] = k
+            res[i][k] = eds[i][k]
 
     return res
 
@@ -67,6 +128,7 @@ class DataStructureGraph(Individ):
     def __init__(self, data=None, labels=None, mode=1, n_neighbors=10, eps=0.5, graph_file: str = None):
         super().__init__()
         self.fullness = 0 # 0-100
+        self.new_individ = True
         if data is None:
             return
         
@@ -82,6 +144,7 @@ class DataStructureGraph(Individ):
                 self.load_graph(data, graph_data)
         elif mode:
             self.find_ED(eps, data)
+            self.draw_2d_projection(data)
             temp_edges = forming_dict(self.graph, self.matrix_connect)
             start_node_index = self.choosing_start_node()
             res, delete_edges = chekkk(data, temp_edges, [start_node_index])
@@ -134,7 +197,47 @@ class DataStructureGraph(Individ):
         runner.save_end_graph(res, name=f'graph_{num}.txt')
 
 
+    def draw_2d_projection(self,data):
+        import networkx as nx
+        net_graph = nx.Graph()
 
+        net_graph.add_nodes_from(np.arange(data.shape[0]))
+
+        count = 0
+        there_edge = np.zeros((data.shape[0], data.shape[0]))
+
+        for i, val in enumerate(self.graph):
+            for j in self.graph[val]:
+                count += 1
+                if i == j:
+                    continue
+                if there_edge[i][j] == 1 or there_edge[j][i] == 1:
+                    continue
+                net_graph.add_edge(i, j)
+
+        my_object = IsolateGraph(data=data, colors=data, graph=net_graph)
+        # index_point = max(self.graph, key=lambda item: len(self.graph[item]))
+
+        # my_object.structure[index_point]['min_distance'] = 0
+        # my_object.structure[index_point]['from_node'] = None
+        # print("DEJKSTRA")
+        # my_object.dijkstra([index_point])
+
+        # print("PCA")
+        # fit_data = my_object.get_data_for_pca(index_point)
+        # pca = PCA(n_components=2)
+        # pca.fit(fit_data)
+        # result = pca.transform(fit_data)
+        # my_object.set_new_params(index_point, result)
+
+        # my_object.find_raw_params(pca)
+        # nodes = my_object.structure[index_point]['neighbours']
+        # print("TRANSFORM")
+        # other_nodes = my_object.transform_nodes(nodes)    
+
+        draw(my_object)
+
+        
     def copy(self):
         new_object = self.__class__()
         new_object.graph = deepcopy(self.graph)
@@ -153,12 +256,21 @@ class DataStructureGraph(Individ):
         eds = euclidean_distances(source_data, source_data)
         maxval = np.max(eds)
         self.matrix_connect = eds / maxval
+        k = 0
 
         for i in range(len(eds)):
             self.graph[i] = []
             for j in range(i, len(eds)):
+                if i == j:
+                    continue
                 if eds[i][j] / maxval <= eps:
                     # self.graph.add_edge(i, j, weight=eds[i][j])
+                    try:
+                        if i in self.graph[j]:
+                            print("th")
+                            continue
+                    except:
+                        k = 1
                     self.graph[i].append(j)
                     self.number_of_edges += 1
 
@@ -208,6 +320,9 @@ class DataStructureGraph(Individ):
             except:
                 self.graph[edge[1]].remove(edge[0])
             self.number_of_edges -= 1
+            
+            if edge[0] in self.graph[edge[1]] or edge[1] in self.graph[edge[0]]:
+                print("ux")
 
     
     def replace_subgraph(self, node: int, new_edges: dict):
@@ -245,6 +360,13 @@ class DataStructureGraph(Individ):
                     start_indexs.append(elem)
         
         return res, rem_edges
+    
+    def check_visible(self, data):
+        temp_edges = forming_dict(self.graph, self.matrix_connect)
+        start_node_index = self.choosing_start_node()
+        res, delete_edges = chekkk(data, temp_edges, [start_node_index])
+        self.local_remove(delete_edges)
+
 
 class PopulationGraph(Population):
     """
@@ -456,6 +578,7 @@ class IsolateGraph:
             i += 1
 
         self.eds = euclidean_distances(data, data)
+        self.eds /= self.eds.max()
         self.neighbours = Dict.empty(key_type=int64, value_type=int32[:])
         for i in range(len(data)):
             neigh = []
@@ -470,7 +593,9 @@ class IsolateGraph:
                 "neighbours": neigh,
                 "marker": colors[i]
             }
-            self.neighbours[i] = np.asarray([edge[1] for edge in graph.edges(i)])
+            neighs = np.asarray([edge[1] for edge in graph.edges(i)])
+            if len(neighs) > 0:
+                self.neighbours[i] = neighs
 
     @staticmethod
     def _fitness_wrapper(params, *args):

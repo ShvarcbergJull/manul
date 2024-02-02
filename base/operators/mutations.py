@@ -33,8 +33,9 @@ class MutationIndivid(GeneticOperatorIndivid):
         for method in methods:
             if method:
                 # добавление
+                current_laplassian = individ.laplassian
                 nodes = np.random.choice(np.arange(num_nodes), size=2, replace=False)
-                while individ.laplassian[nodes[0]][nodes[1]] != 0:
+                while current_laplassian[nodes[0]][nodes[1]] != 0:
                     nodes = np.random.choice(np.arange(num_nodes), size=2, replace=False)
                 individ.add_edge(nodes[0], nodes[1])
 

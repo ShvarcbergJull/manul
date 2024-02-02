@@ -96,20 +96,20 @@ def draw(graph: IsolateGraph):
     edges=[]
     for edge in graph.structure:
         pos1 = graph.structure[edge]['tr_pos']
-        # if pos1[0] > 100:
-        #     continue
+        if pos1[0] < -1837.9473415732368:
+            continue
         for neig in graph.structure[edge]['neighbours']:
-            # if graph.structure[neig]['tr_pos'][0] > 100:
-            #     continue
+            if graph.structure[neig]['tr_pos'][0] < -1837.9473415732368:
+                continue
             edges.append(pos1)
             edges.append(graph.structure[neig]['tr_pos'])
             edges.append([None, None])
     
     edges = np.array(edges).T
     print(edges.shape)
-    edge_trace = go.Scatter(x=edges[0], y=edges[1], line=dict(width=4, color='#888'), hoverinfo='none', mode='lines')
+    edge_trace = go.Scatter(x=edges[0], y=edges[1], line=dict(width=0.5, color='#888'), hoverinfo='none', mode='lines')
     
-    nodes = np.array([graph.structure[node]['tr_pos'] for node in graph.structure]).T
+    nodes = np.array([graph.structure[node]['tr_pos'] for node in graph.structure if graph.structure[node]["tr_pos"][0] >= -1837.9473415732368]).T
     colors = np.array([graph.structure[node]['marker'] for node in graph.structure])
     print(nodes.shape)
     node_trace = go.Scatter(x=nodes[0], y=nodes[1], mode='markers', hoverinfo='text',
@@ -131,7 +131,7 @@ def draw(graph: IsolateGraph):
                                 ),
                                 line_width=2))
     
-    fig = go.Figure(data=[edge_trace, node_trace],
+    fig = go.Figure(data=[edge_trace],
              layout=go.Layout(
                 title='<br>Network graph made with Python',
                 titlefont_size=16,
@@ -146,7 +146,7 @@ def draw(graph: IsolateGraph):
                 xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                 yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
                 )
-    fig.write_html("air_base.html")
+    fig.write_html("teyw_0.html")
     # fig.show()
 
 
@@ -154,17 +154,27 @@ if __name__ == "__main__":
     feature, target = airfoil_exmpl()
     # feature, target = mammonth_example()
     train_feature, train_target, test_feature, test_target, dims = handler_of_data(feature, target)
-    graph = open("results\\airflou\\graph.txt", "r")
+    graph = open("Info_log\\2024_01_31-05_02_20_PM\\graph_0.txt", "r")
     graph = ast.literal_eval(graph.read())
 
     import networkx as nx
     net_graph = nx.Graph()
 
+    net_graph.add_nodes_from(np.arange(train_feature.shape[0]))
+
+    count = 0
+    there_edge = np.zeros((train_feature.shape[0], train_feature.shape[0]))
+
     for i, val in enumerate(graph):
         for j in val:
+            count += 1
             if i == j:
                 continue
+            if there_edge[i][j] == 1 or there_edge[j][i] == 1:
+                continue
             net_graph.add_edge(i, j)
+
+    print(net_graph.number_of_edges(), count)
 
     my_object = IsolateGraph(data=train_feature.detach().numpy(), colors=train_target.detach().numpy(), graph=net_graph)
     index_point = IsolateGraph.get_started_point(graph_neigh=graph)

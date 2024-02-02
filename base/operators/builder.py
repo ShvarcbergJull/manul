@@ -64,5 +64,5 @@ def create_operator_map(grid, individ, model, kwargs):
     operatorsMap.FitnessPopulation = FitnessPopulation()
 
     operatorsMap.FilterPopulation = FilterPopulation(
-        params=dict(population_size=population_size)
+        params=dict(population_size=population_size, source_data=grid.detach().numpy())
     )

@@ -111,7 +111,8 @@ def handler_of_data(feature, target):
     return train_features, train_target, test_features, test_target, dims
 
 if __name__ == "__main__":
-    feature, target = airfoil_exmpl()
+    # feature, target = airfoil_exmpl()
+    feature, target = mammonth_example()
     train_feature, train_target, test_feature, test_target, dims = handler_of_data(feature, target)
     N = len(test_feature)
 
@@ -125,11 +126,11 @@ if __name__ == "__main__":
     res2 = []
     val = []
 
-    for i in range(10):
-        raw_res = open(f"Info_log\\2024_01_26-02_13_46_PM\\raw_result1_{i}.txt", "r")
+    for i in range(2):
+        raw_res = open(f"Info_log\\2024_01_30-01_33_38_PM\\raw_result1_{i}.txt", "r")
         raw_res = raw_res.read().replace("\n", ", ")
         raw_res = np.array(ast.literal_eval(raw_res))
-        res = open(f"Info_log\\2024_01_26-02_13_46_PM\\raw_result2_{i}.txt", "r")
+        res = open(f"Info_log\\2024_01_30-01_33_38_PM\\raw_result2_{i}.txt", "r")
         res = res.read().replace("\n", ", ")
         res = np.array(ast.literal_eval(res))
 
@@ -141,11 +142,11 @@ if __name__ == "__main__":
     res2 = np.array(res2)
     import pandas as pd
     df1 = pd.DataFrame({'Experiment': val, 
-                        'Prediction Absolut Error': res1, 
+                        'Prediction Absolute Error': res1, 
                         'Model': 'base'})
     
     df2 = pd.DataFrame({'Experiment': val, 
-                        'Prediction Absolut Error': res2, 
+                        'Prediction Absolute Error': res2, 
                         'Model': 'EA'})
     
     df_aggreg = pd.concat([df1, df2], axis = 0)
@@ -160,7 +161,7 @@ if __name__ == "__main__":
     px.defaults.width = 600
     px.defaults.height = 500
 
-    fig = px.box(df_aggreg, x="Experiment", y="Prediction Absolut Error", color="Model")
+    fig = px.box(df_aggreg, x="Experiment", y="Prediction Absolute Error", color="Model")
     fig.update_traces(quartilemethod="linear") # or "inclusive", or "linear" by default
     fig.update_layout(
         xaxis = dict(

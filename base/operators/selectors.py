@@ -86,3 +86,7 @@ class FilterPopulation(GeneticOperatorPopulation):
             new_structure.extend(elite)
 
         population.structure = new_structure
+
+        #for individ in population.structure:
+        #    individ.check_visible(self.params["source_data"])
+        #     print("CHEcK done")

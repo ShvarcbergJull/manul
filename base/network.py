@@ -75,7 +75,7 @@ class Graph(nx.Graph):
         self.my_laplassian = np.zeros((data.shape[0], data.shape[0]))
 
         self.connected = self.kernel.A.todense()
-        self.find_ED_new(0.15)
+        self.find_ED_new(0.05)
         # self.find_graph(0.15)
         self.drawing = Draw(self)
 
@@ -147,8 +147,8 @@ class Graph(nx.Graph):
         for i in range(len(eds)):
             for j in range(i+1, len(eds)):
                 if eds[i][j] / maxval <= eps:
-                    # self.add_edge(i, j, weight=eds[i][j])
-                    pass
+                    self.add_edge(i, j, weight=eds[i][j])
+                    # pass
                     # self.AM[i, j] = 1
                     # self.KM[j, i] = eds[i][j]
 
