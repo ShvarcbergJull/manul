@@ -38,10 +38,12 @@ class MutationIndivid(GeneticOperatorIndivid):
                 while current_laplassian[nodes[0]][nodes[1]] != 0:
                     nodes = np.random.choice(np.arange(num_nodes), size=2, replace=False)
                 individ.add_edge(nodes[0], nodes[1])
-
+                individ.check_vn_part(self.params["source_data"], nodes[0], nodes[1])
             else:
                 # удаление
                 # edges = np.array([[int(elem[0]), int(elem[1]), elem[2]["weight"]] for elem in list(individ.graph.edges(data=True))])
+                if individ.number_of_edges == 0:
+                    continue
                 probability = []
                 edges = []
                 for key in graph:

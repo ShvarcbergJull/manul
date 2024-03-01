@@ -44,7 +44,7 @@ def draw(graph):
     nodes = np.array([graph.structure[node]['orig_pos'] for node in graph.structure]).T
     colors = np.array([graph.structure[node]['marker'] for node in graph.structure])
     print(nodes.shape)
-    node_trace = go.Scatter3d(x=nodes[0], y=nodes[1], z=nodes[2], mode='markers', hoverinfo='text',
+    node_trace = go.Scatter3d(x=nodes[0], y=nodes[1], z=nodes[2], mode='markers',
                                 marker=dict(
                                     showscale=True,
                                     # colorscale options
@@ -115,10 +115,12 @@ def forming_dict(graph, eds):
     for i in graph:
         res.append(Dict.empty(key_type=int64, value_type=float64))
         # res[i] = {}
+    for i in graph:
         sort_eds = np.argsort(eds[i])
         current_neih_indexs = filter(lambda ind: ind in graph[i],sort_eds)
         for k in current_neih_indexs:
             # res[i][eds[i][k]] = k
+            res[k][i] = eds[i][k]
             res[i][k] = eds[i][k]
 
     return res
@@ -138,25 +140,31 @@ class DataStructureGraph(Individ):
         self.number_of_edges = 0
         
         if graph_file is not None:
-                with open(graph_file, "r") as fl:
-                    graph_data = fl.read()
-                graph_data = ast.literal_eval(graph_data)
-                self.load_graph(data, graph_data)
+            # with open(graph_file, "r") as fl:
+            #     graph_data = fl.read()
+            # graph_data = ast.literal_eval(graph_data)
+            # self.load_graph(data, graph_data)
+            self.find_ED(eps, data)
+            self.name_gr = f"{runner.get_path()}/graph.txt"
+            self.save_end_graph("rer")
         elif mode:
             self.find_ED(eps, data)
-            self.draw_2d_projection(data)
+            # self.draw_2d_projection(data)
             temp_edges = forming_dict(self.graph, self.matrix_connect)
             start_node_index = self.choosing_start_node()
             res, delete_edges = chekkk(data, temp_edges, [start_node_index])
             runner.save_graph(res)
             self.name_gr = f"{runner.get_path()}/graph.txt"
             self.local_remove(delete_edges)
+            self.save_end_graph("or")
+            self.draw_2d_projection(data)
         else:
             self.kernel = tp.tpgraph.Kernel(n_neighbors=n_neighbors, n_jobs=1, metric='cosine', fuzzy=True, verbose=True)
             self.kernel.fit(data)
             self.create_edges()
 
 
+        # self.draw_2d_projection(data)
         self.calc_fullness()
 
     
@@ -216,25 +224,6 @@ class DataStructureGraph(Individ):
                 net_graph.add_edge(i, j)
 
         my_object = IsolateGraph(data=data, colors=data, graph=net_graph)
-        # index_point = max(self.graph, key=lambda item: len(self.graph[item]))
-
-        # my_object.structure[index_point]['min_distance'] = 0
-        # my_object.structure[index_point]['from_node'] = None
-        # print("DEJKSTRA")
-        # my_object.dijkstra([index_point])
-
-        # print("PCA")
-        # fit_data = my_object.get_data_for_pca(index_point)
-        # pca = PCA(n_components=2)
-        # pca.fit(fit_data)
-        # result = pca.transform(fit_data)
-        # my_object.set_new_params(index_point, result)
-
-        # my_object.find_raw_params(pca)
-        # nodes = my_object.structure[index_point]['neighbours']
-        # print("TRANSFORM")
-        # other_nodes = my_object.transform_nodes(nodes)    
-
         draw(my_object)
 
         
@@ -330,6 +319,33 @@ class DataStructureGraph(Individ):
         self.graph[node] = []
         for elem in new_edges:
             self.add_edge(node, elem)
+
+    
+    def check_vn_part(self, source_data, node1, node2):
+        general_neighbours = []
+        del_list = []
+        gr1 = self.graph[node1]
+        gr2 = self.graph[node2]
+        for neigh in gr1:
+            if neigh in gr2:
+                general_neighbours.append(neigh)
+
+        data_neigh = source_data[general_neighbours]
+        dif_n1 = source_data[node1] - data_neigh
+        dif_n2 = source_data[node1] - source_data[node2]
+
+        result = np.diag(np.dot(dif_n1, dif_n2.T))
+        for i, res in enumerate(result[result < 0]):
+            del_list.append((node1, general_neighbours[i]))
+        
+        dif_n1 = source_data[node2] - data_neigh
+        dif_n2 = source_data[node2] - source_data[node1]
+
+        result = np.diag(np.dot(dif_n1, dif_n2.T))
+        for i, res in enumerate(result[result < 0]):
+            del_list.append((node2, general_neighbours[i]))
+        
+        self.local_remove(del_list)
 
 
     @staticmethod

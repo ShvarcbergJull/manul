@@ -14,12 +14,12 @@ from copy import deepcopy
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, f1_score, mean_squared_error
 import matplotlib.pyplot as plt
 
-from base.entities import DataStructureGraph, PopulationGraph, TakeNN
+from base.entities import DataStructureGraph, PopulationGraph, TakeNN, forming_dict
 from base.operators.builder import create_operator_map
 from base.operators.base import ProgramRun
 
 from generate_simple_data import create_swiss_roll, create_circle
-from data_forming import airfoil_exmpl
+from data_forming import airfoil_exmpl, mammonth_example
 
 def handler_of_data(feature, target):
     # dims = len(feature.keys())
@@ -134,6 +134,39 @@ def run_experiment_regression(base_model, test_feature, test_target, number):
 
     return return_dictionary
 
+def forming_connect(graph):
+    # res = {}
+    res = []
+    for i in graph:
+        res.append({'index': i, 'neighbours': [], 'stamp': False})
+        # res[i] = {}
+    for i in graph:
+        for k in graph[i]:
+            # res[i][eds[i][k]] = k
+            res[k]['neighbours'].append(i)
+            res[i]['neighbours'].append(k)
+
+    return res
+
+def searсh_basis(graph, source_data):
+    basis = []
+    graph = forming_connect(graph)
+    temp_graph = list(filter(lambda elem: not elem['stamp'], graph))
+    while len(temp_graph) > 0:
+        max_index = np.argmax([len(elem['neighbours']) for elem in temp_graph])
+        use_index = temp_graph[max_index]['neighbours']
+        use_index.append(temp_graph[max_index]['index'])
+        average_values = np.average(source_data[use_index], axis=0)
+        choose_point = use_index[0]
+        for indx in use_index:
+            if ((source_data[indx] - average_values) ** 2).sum().sqrt() < ((source_data[choose_point] - average_values) ** 2).sum().sqrt():
+                choose_point = indx
+            graph[indx]['stamp'] = True
+        basis.append(choose_point)
+        temp_graph = list(filter(lambda elem: not elem['stamp'], graph))
+
+    return basis
+
 
 def main(data: Union[str, np.ndarray]):
     # feature, target = exp_sonar()
@@ -142,15 +175,20 @@ def main(data: Union[str, np.ndarray]):
     # feature, target = expe_water()
     # feature, target = exp_airlines()
     # feature, target = wine_example()
-    # feature, target = mammonth_example()
+    feature, target = mammonth_example()
     # feature, target = airfoil_exmpl()
-    feature = data[:, :-1]
-    target = data[:, -1]
+    # feature = data[:, :-1]
+    # target = data[:, -1]
     train_feature, train_target, test_feature, test_target, dims = handler_of_data(feature, target)
     print(train_feature.shape)
 
     logging.info("Creating base individ...")
-    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), n_neighbors=20, eps=0.5)
+    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), graph_file="Info_log\\2024_02_27-12_13_10_PM\\graph_or.txt", n_neighbors=20, eps=0.15)
+    basis = searсh_basis(base_individ.graph, train_feature)
+    with open("test_bas.txt", 'w') as fl:
+        fl.write(str(basis))
+    other_indiv = DataStructureGraph(train_feature.numpy()[basis], train_target.numpy()[basis], n_neighbors=20, eps=0.15)
+    # pass
     base_model = TakeNN(train_feature, train_target, dims=dims, num_epochs=30, batch_size=300)
     logging.info("Creating map with operators and population")
 

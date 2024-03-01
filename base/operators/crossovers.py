@@ -15,7 +15,7 @@ class CrossoverIndivid(GeneticOperatorIndivid):
         ind1 = individ
         ind2 = kwargs['other_individ']
 
-        probability = np.array([len(ind1.graph[i]) + len(ind2.graph[i]) for i in range(ind1.number_of_nodes)])
+        probability = np.array([abs(len(ind1.graph[i]) - len(ind2.graph[i])) for i in range(ind1.number_of_nodes)])
         probability = probability / probability.sum()
         start_node_index = np.random.choice(np.arange(ind1.number_of_nodes), size=1, p=probability)[0]
 

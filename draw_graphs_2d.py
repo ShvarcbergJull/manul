@@ -7,13 +7,14 @@ import sys
 from sklearn.decomposition import PCA
 import plotly.graph_objects as go
 
+from data_forming import airfoil_exmpl, mammonth_example
+
 root_dir = '/'.join(os.getcwd().split("/")[:-1])
 sys.path.append(root_dir)
 
 from base.entities import IsolateGraph
 
 logger = logging.getLogger()
-
 def handler_of_data(feature, target):
     # dims = len(feature.keys())
     dims = feature.shape[-1]
@@ -27,7 +28,7 @@ def handler_of_data(feature, target):
     
     # grid_flattened = grid_tensor.view(grid_tensor.shape[0], -1).transpose(0, 1)
     grid_flattened = grid_tensor.to(grid_tensor.to(torch.float64))
-    param = len(target) // 100 * 80
+    param = int(len(target) / 100 * 80)
     train_features = grid_flattened[:param]
     train_target = torch.tensor(target)[:param]
     test_features = grid_flattened[param:]
@@ -44,44 +45,44 @@ def wine_example():
 
     return features, target
 
-def mammonth_example():
-    import ast
-    fl = open("data/mammoth_3d.json ", "r")
-    data = fl.read()
-    data = ast.literal_eval(data)
+# def mammonth_example():
+#     import ast
+#     fl = open("data/mammoth_3d.json ", "r")
+#     data = fl.read()
+#     data = ast.literal_eval(data)
 
-    data = np.array(data)
-    N = len(data)
-    colors = np.linspace(0, 0.9, N)
+#     data = np.array(data)
+#     N = len(data)
+#     colors = np.linspace(0, 0.9, N)
 
-    data = np.array(sorted(data, key=lambda parameters: parameters[2]))
-    new_data = []
-    new_colors = []
+#     data = np.array(sorted(data, key=lambda parameters: parameters[2]))
+#     new_data = []
+#     new_colors = []
 
-    for i, dt in enumerate(data):
-        if i % 3 != 0:
-            continue
-        new_data.append(dt)
-        new_colors.append(colors[i])
+#     for i, dt in enumerate(data):
+#         if i % 3 != 0:
+#             continue
+#         new_data.append(dt)
+#         new_colors.append(colors[i])
 
-    data = []
-    colors = []
+#     data = []
+#     colors = []
 
-    temp_data = []
-    temp_colors = []
+#     temp_data = []
+#     temp_colors = []
 
-    for i, dat in enumerate(new_data):
-        if i % 2 != 0:
-            temp_data.append(dat)
-            temp_colors.append(new_colors[i])
-        else:
-            data.append(dat)
-            colors.append(new_colors[i])
+#     for i, dat in enumerate(new_data):
+#         if i % 2 != 0:
+#             temp_data.append(dat)
+#             temp_colors.append(new_colors[i])
+#         else:
+#             data.append(dat)
+#             colors.append(new_colors[i])
 
-    colors.extend(temp_colors)
-    data.extend(temp_data)
+#     colors.extend(temp_colors)
+#     data.extend(temp_data)
 
-    return np.array(data), np.array(colors)
+#     return np.array(data), np.array(colors)
 
 
 def airfoil_exmpl():
@@ -131,7 +132,7 @@ def draw(graph: IsolateGraph):
                                 ),
                                 line_width=2))
     
-    fig = go.Figure(data=[edge_trace],
+    fig = go.Figure(data=[edge_trace, node_trace],
              layout=go.Layout(
                 title='<br>Network graph made with Python',
                 titlefont_size=16,
@@ -146,15 +147,21 @@ def draw(graph: IsolateGraph):
                 xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                 yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
                 )
-    fig.write_html("teyw_0.html")
+    fig.write_html("re.html")
     # fig.show()
 
 
 if __name__ == "__main__":
-    feature, target = airfoil_exmpl()
-    # feature, target = mammonth_example()
+    # feature, target = airfoil_exmpl()
+    feature, target = mammonth_example()
     train_feature, train_target, test_feature, test_target, dims = handler_of_data(feature, target)
-    graph = open("Info_log\\2024_01_31-05_02_20_PM\\graph_0.txt", "r")
+    # graph = open("Info_log\\2024_02_27-12_13_10_PM\\graph_or.txt", "r")
+    graph = open("Info_log\\2024_03_01-05_13_00_PM\\graph_or.txt", 'r')
+    bas = open("test_bas.txt", 'r')
+    bas = bas.read()
+    bas = ast.literal_eval(bas)
+    train_feature = train_feature[bas]
+    train_target = train_target[bas]
     graph = ast.literal_eval(graph.read())
 
     import networkx as nx

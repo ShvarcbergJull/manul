@@ -52,7 +52,8 @@ def create_operator_map(grid, individ, model, kwargs):
 
     operatorsMap.MutationIndivid = MutationIndivid(
         params=dict(mut_intensive=mutation['simple']['intensive'],
-                    increase_prob=mutation['simple']['increase_prob'])
+                    increase_prob=mutation['simple']['increase_prob'],
+                    source_data=grid.detach().numpy())
     )
 
     operatorsMap.VarFitnessIndivid = VarFitnessIndivid(
