@@ -175,15 +175,16 @@ def main(data: Union[str, np.ndarray]):
     # feature, target = expe_water()
     # feature, target = exp_airlines()
     # feature, target = wine_example()
-    feature, target = mammonth_example()
+    # feature, target = mammonth_example()
     # feature, target = airfoil_exmpl()
-    # feature = data[:, :-1]
-    # target = data[:, -1]
+    feature = data[:, :-1]
+    target = data[:, -1]
     train_feature, train_target, test_feature, test_target, dims = handler_of_data(feature, target)
     print(train_feature.shape)
 
     logging.info("Creating base individ...")
-    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), graph_file="Info_log\\2024_02_27-12_13_10_PM\\graph_or.txt", n_neighbors=20, eps=0.15)
+    # base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), graph_file="Info_log\\2024_02_27-12_13_10_PM\\graph_or.txt", n_neighbors=20, eps=0.15)
+    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), n_neighbors=20, eps=0.6)
     basis = searсh_basis(base_individ.graph, train_feature)
     with open("test_bas.txt", 'w') as fl:
         fl.write(str(basis))

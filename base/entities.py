@@ -23,6 +23,10 @@ from sklearn.metrics import f1_score, roc_auc_score, mean_squared_error
 from scipy.optimize import minimize
 from sklearn.decomposition import PCA
 
+# temp_edges = None
+# selects = None
+# source_data = None
+
 
 def draw(graph):
     edges=[]
@@ -109,12 +113,70 @@ def chekkk(source_data, res, start_indexs):
     
     return res, rem_edges
 
+def probe_function(source_data, res, selects, index):
+    del_list = []
+    next_index = []
+    selects[index] = 1
+    if len(res[index]) == 0:
+        return del_list
+    neigh_indxs = np.array(list(res[index].keys())[::-1])
+    add_params = source_data[neigh_indxs]
+    neighbours = source_data[index] - add_params
+
+    for i, elem in enumerate(neigh_indxs):
+        if selects[elem] == 1:
+            continue
+        check_this = source_data[elem]
+        neigh_2 = check_this - add_params
+        result = np.diag(np.dot(neighbours, neigh_2.T))
+        if len(result[result < 0]) > 0:
+            del res[index][elem]
+            del_list.append((index, elem))
+        else:
+            next_index.append(elem)
+
+    return [del_list, next_index]
+
+def probe_onine_2(index):
+    global selects, temp_edges, source_data
+    del_list = []
+    next_index = []
+    selects[index] = True
+    if len(temp_edges[index]) == 0:
+        return del_list
+    neigh_indxs = np.array(list(temp_edges[index].keys())[::-1])
+    add_params = source_data[neigh_indxs]
+    neighbours = source_data[index] - add_params
+
+    print("bv", neigh_indxs)
+
+    for i, elem in enumerate(neigh_indxs):
+        print("im here")
+        if selects[elem] == 1:
+            continue
+        print("hell")
+        check_this = source_data[elem]
+        print("156")
+        neigh_2 = check_this - add_params
+        print("158")
+        result = np.diag(np.dot(neighbours, neigh_2.T))
+        print("160")
+        if len(result[result < 0]) > 0:
+            print("162")
+            del temp_edges[index][elem]
+            del_list.append((index, elem))
+        print("165")
+        # else:
+        #     next_index.append(elem)
+
+    return del_list
+
 def forming_dict(graph, eds):
     # res = {}
     res = []
     for i in graph:
-        res.append(Dict.empty(key_type=int64, value_type=float64))
-        # res[i] = {}
+        # res.append(Dict.empty(key_type=int64, value_type=float64))
+        res.append({})
     for i in graph:
         sort_eds = np.argsort(eds[i])
         current_neih_indexs = filter(lambda ind: ind in graph[i],sort_eds)
@@ -150,12 +212,14 @@ class DataStructureGraph(Individ):
         elif mode:
             self.find_ED(eps, data)
             # self.draw_2d_projection(data)
-            temp_edges = forming_dict(self.graph, self.matrix_connect)
-            start_node_index = self.choosing_start_node()
-            res, delete_edges = chekkk(data, temp_edges, [start_node_index])
+            # temp_edges = forming_dict(self.graph, self.matrix_connect)
+            # start_node_index = self.choosing_start_node()
+            # res, delete_edges = chekkk(data, temp_edges, [start_node_index])
+            # res = self.check_visible(data)
+            res = self.check_visible_v2(data)
             runner.save_graph(res)
             self.name_gr = f"{runner.get_path()}/graph.txt"
-            self.local_remove(delete_edges)
+            # self.local_remove(delete_edges)
             self.save_end_graph("or")
             self.draw_2d_projection(data)
         else:
@@ -347,6 +411,29 @@ class DataStructureGraph(Individ):
         
         self.local_remove(del_list)
 
+    # @staticmethod
+    # @njit
+    # def probe_function(source_data, res, selects, index):
+    #     del_list = []
+    #     next_index = []
+    #     if len(res[index]) == 0:
+    #         return del_list
+    #     neigh_indxs = np.array(list(res[index].keys())[::-1])
+    #     add_params = source_data[neigh_indxs]
+    #     neighbours = source_data[index] - add_params
+
+    #     for i, elem in enumerate(neigh_indxs):
+    #         if selects[elem] == 1:
+    #             continue
+    #         check_this = source_data[elem]
+    #         neigh_2 = check_this - add_params
+    #         result = np.diag(np.dot(neighbours, neigh_2.T))
+    #         if len(result[result < 0]) > 0:
+    #             del_list.append((index, elem))
+    #         # else:
+    #         #     next_index.append(elem)
+
+    #     return del_list
 
     @staticmethod
     @njit
@@ -358,8 +445,8 @@ class DataStructureGraph(Individ):
             selects[current_index] = 1
             if len(res[current_index]) == 0:
                 continue
-            kss = list(res[current_index].keys())[::-1]
-            neigh_indxs = np.array([res[current_index][i] for i in kss])
+            neigh_indxs = np.array(list(res[current_index].keys())[::-1])
+            # neigh_indxs = np.array([res[current_index][i] for i in kss])
             add_params = source_data[neigh_indxs]
             neighbours = source_data[current_index] - add_params
 
@@ -370,18 +457,57 @@ class DataStructureGraph(Individ):
                 neigh_2 = check_this - add_params
                 result = np.diag(np.dot(neighbours, neigh_2.T))
                 if len(result[result < 0]) > 0:
-                    del res[current_index][kss[i]]
+                    del res[current_index][elem]
                     rem_edges.append((current_index, elem))
                 else:
                     start_indexs.append(elem)
         
         return res, rem_edges
     
+    def check_visible_v2(self, data):
+        from multiprocessing import Pool
+        from functools import partial
+        from itertools import chain
+        # global temp_edges, selects, source_data
+        temp_edges = forming_dict(self.graph, self.matrix_connect)
+        start_node_index = [self.choosing_start_node()]
+        selects = np.zeros((len(data)))
+        probe_online = partial(probe_function, data, temp_edges, selects)
+        i = 0
+
+        while len(start_node_index) > 0:
+            if i == 0: 
+                del_lists = probe_online(start_node_index[0])
+                self.local_remove(del_lists[0])
+                i = 1
+            else:
+                with Pool(2) as p:
+                    del_lists = list(p.map(probe_online, start_node_index))
+                selects[start_node_index] = 1
+                start_node_index =[]
+                for elem in del_lists:
+                    self.local_remove(elem[0])
+                    for pr in elem[0]:
+                        del temp_edges[pr[0]][pr[1]]
+                    add_elems = [el for el in elem[1] if el not in start_node_index]
+                    start_node_index.extend(add_elems)
+                # map(lambda lst: self.local_remove(lst), del_lists)
+            # temp = []
+            # for index in start_node_index:
+            #     temp.extend([elem for elem in temp_edges[index] if selects[elem] == 0])
+            #     selects[index] = 1
+            # start_node_index = temp
+            print(len(selects[selects==True]))
+
+        return temp_edges
+    
     def check_visible(self, data):
         temp_edges = forming_dict(self.graph, self.matrix_connect)
         start_node_index = self.choosing_start_node()
         res, delete_edges = chekkk(data, temp_edges, [start_node_index])
         self.local_remove(delete_edges)
+
+        return res
 
 
 class PopulationGraph(Population):
