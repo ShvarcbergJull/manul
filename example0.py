@@ -14,12 +14,12 @@ from copy import deepcopy
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, f1_score, mean_squared_error
 import matplotlib.pyplot as plt
 
-from base.entities import DataStructureGraph, PopulationGraph, TakeNN, forming_dict
+from base.entities import DataStructureGraph, PopulationGraph, TakeNN
 from base.operators.builder import create_operator_map
 from base.operators.base import ProgramRun
 
 from generate_simple_data import create_swiss_roll, create_circle
-from data_forming import airfoil_exmpl, mammonth_example
+from data_forming import airfoil_exmpl, exp_airlines, mammonth_example, exp_real_data2
 
 def handler_of_data(feature, target):
     # dims = len(feature.keys())
@@ -72,17 +72,19 @@ def run_experiment(base_model, test_feature, test_target, number):
     result1 = base_model.model_settings['model'](test_feature)
     result1 = result1.detach().numpy()
     result1 = np.where(result1 > base_model.threshold, 1, 0)
+    runner.save_pickle(result1, f"result1_{number}.pkl")
 
     metric_nn_1 = f1_score(test_target.reshape(-1), result1.reshape(-1), average=None)
 
-    population = PopulationGraph(iterations=15)
-    population.evolutionary()
+    population = PopulationGraph(iterations=50)
+    population.evolutionary(num=number)
 
     # population.base_model.train(find_graph_loss, population.laplassian)
 
     result2 = population.base_model.model_settings['model'](test_feature)
     result2 = result2.detach().numpy()
     result2 = np.where(result2 > population.base_model.threshold, 1, 0)
+    runner.save_pickle(result2, f"result2_{number}.pkl")
 
     metric_nn_2 = f1_score(test_target.reshape(-1), result2.reshape(-1), average=None)
 
@@ -104,22 +106,26 @@ def run_experiment_regression(base_model, test_feature, test_target, number):
     base_model.train()
     result1 = base_model.model_settings['model'](test_feature)
     result1 = result1.detach().numpy()
-    runner.save_end_graph(data=result1, name=f"raw_result1_{number}.txt")
+    # runner.save_end_graph(data=result1, name=f"raw_result1_{number}.txt")
+    runner.save_pickle(result1, f"raw_result1_{number}.pkl")
     result1 = result1.round().astype("int64")
-    runner.save_end_graph(data=result1, name=f"result1_{number}.txt")
+    # runner.save_end_graph(data=result1, name=f"result1_{number}.txt")
+    runner.save_pickle(result1, f"result1_{number}.pkl")
 
     metric_nn_1 = mean_squared_error(test_target.reshape(-1), result1.reshape(-1))
 
-    population = PopulationGraph(iterations=10)
+    population = PopulationGraph(iterations=400)
     population.evolutionary(num=number)
 
     # population.base_model.train(find_graph_loss, population.laplassian)
 
     result2 = population.base_model.model_settings['model'](test_feature)
     result2 = result2.detach().numpy()
-    runner.save_end_graph(data=result2, name=f"raw_result2_{number}.txt")
+    # runner.save_end_graph(data=result2, name=f"raw_result2_{number}.txt")
+    runner.save_pickle(result2, f"raw_result2_{number}.pkl")
     result2 = result2.round().astype("int64")
-    runner.save_end_graph(data=result2, name=f"result2_{number}.txt")
+    # runner.save_end_graph(data=result2, name=f"result2_{number}.txt")
+    runner.save_pickle(result2, f"result2_{number}.pkl")
 
     metric_nn_2 = mean_squared_error(test_target.reshape(-1), result2.reshape(-1))
 
@@ -175,22 +181,23 @@ def main(data: Union[str, np.ndarray]):
     # feature, target = expe_water()
     # feature, target = exp_airlines()
     # feature, target = wine_example()
-    # feature, target = mammonth_example()
+    feature, target = mammonth_example()
     # feature, target = airfoil_exmpl()
-    feature = data[:, :-1]
-    target = data[:, -1]
+    # feature = data[:, :-1]
+    # target = data[:, -1]
     train_feature, train_target, test_feature, test_target, dims = handler_of_data(feature, target)
     print(train_feature.shape)
 
     logging.info("Creating base individ...")
     # base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), graph_file="Info_log\\2024_02_27-12_13_10_PM\\graph_or.txt", n_neighbors=20, eps=0.15)
-    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), n_neighbors=20, eps=0.6)
-    basis = searсh_basis(base_individ.graph, train_feature)
+    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), n_neighbors=10, eps=0.15, mode=0)
+    # basis = searсh_basis(base_individ.graph, train_feature)
+    # print("Searching base", len(train_feature), len(basis))
     with open("test_bas.txt", 'w') as fl:
-        fl.write(str(basis))
-    other_indiv = DataStructureGraph(train_feature.numpy()[basis], train_target.numpy()[basis], n_neighbors=20, eps=0.15)
+        fl.write(str(base_individ.basis))
+    # other_indiv = DataStructureGraph(train_feature.numpy()[basis], train_target.numpy()[basis], n_neighbors=7, eps=0.15, mode=0)
     # pass
-    base_model = TakeNN(train_feature, train_target, dims=dims, num_epochs=30, batch_size=300)
+    base_model = TakeNN(train_feature[base_individ.basis], train_target[base_individ.basis], dims=dims, num_epochs=30, batch_size=300)
     logging.info("Creating map with operators and population")
 
     build_settings = {
@@ -218,6 +225,7 @@ def main(data: Union[str, np.ndarray]):
     for i in range(1):
         new_model = TakeNN(train_feature, train_target, dims=dims, num_epochs=30, batch_size=300)
         result = run_experiment_regression(new_model, test_feature, test_target, i)
+        # result = run_experiment(new_model, test_feature, test_target, i)
         boxplot_data.append(result['f1_score'])
 
     # runner.save_boxplot("boxplot", boxplot_data)
@@ -225,8 +233,8 @@ def main(data: Union[str, np.ndarray]):
 
 
 if __name__ == "__main__":
-    # data = create_swiss_roll(1000)
-    data = create_circle(1, 20)
+    data = create_swiss_roll(12000)
+    # data = create_circle(1, 10000)
     # data = "data/electricity-normalized.arff"
     # data = "data/phpSSK7iA.arff"
     # data = "data/sonar_dataset.csv"

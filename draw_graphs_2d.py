@@ -7,7 +7,8 @@ import sys
 from sklearn.decomposition import PCA
 import plotly.graph_objects as go
 
-from data_forming import airfoil_exmpl, mammonth_example
+from data_forming import airfoil_exmpl, mammonth_example, exp_real_data2
+from generate_simple_data import create_swiss_roll
 
 root_dir = '/'.join(os.getcwd().split("/")[:-1])
 sys.path.append(root_dir)
@@ -93,7 +94,7 @@ def airfoil_exmpl():
 
     return features, target
 
-def draw(graph: IsolateGraph):
+def draw(graph: IsolateGraph, ind: int):
     edges=[]
     for edge in graph.structure:
         pos1 = graph.structure[edge]['tr_pos']
@@ -147,16 +148,20 @@ def draw(graph: IsolateGraph):
                 xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                 yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
                 )
-    fig.write_html("re.html")
+    fig.write_html(f"re{ind}.html")
     # fig.show()
 
 
 if __name__ == "__main__":
+    feature, target = exp_real_data2()
     # feature, target = airfoil_exmpl()
-    feature, target = mammonth_example()
+    # feature, target = mammonth_example()
+    # data = create_swiss_roll(12000)
+    # feature = data[:, :-1]
+    # target = data[:, -1]
     train_feature, train_target, test_feature, test_target, dims = handler_of_data(feature, target)
     # graph = open("Info_log\\2024_02_27-12_13_10_PM\\graph_or.txt", "r")
-    graph = open("Info_log\\2024_03_01-05_13_00_PM\\graph_or.txt", 'r')
+    graph = open("Info_log/2024_03_22-06_20_30_PM/graph_0.txt", 'r')
     bas = open("test_bas.txt", 'r')
     bas = bas.read()
     bas = ast.literal_eval(bas)
@@ -186,11 +191,13 @@ if __name__ == "__main__":
     my_object = IsolateGraph(data=train_feature.detach().numpy(), colors=train_target.detach().numpy(), graph=net_graph)
     index_point = IsolateGraph.get_started_point(graph_neigh=graph)
 
+    # for index_point in index_points:
     my_object.structure[index_point]['min_distance'] = 0
     my_object.structure[index_point]['from_node'] = None
     print("DEJKSTRA")
     my_object.dijkstra([index_point])
 
+    # for index_point in index_points:
     print("PCA")
     fit_data = my_object.get_data_for_pca(index_point)
     pca = PCA(n_components=2)
@@ -203,4 +210,4 @@ if __name__ == "__main__":
     print("TRANSFORM")
     other_nodes = my_object.transform_nodes(nodes)
 
-    draw(my_object)
+    draw(my_object, index_point)

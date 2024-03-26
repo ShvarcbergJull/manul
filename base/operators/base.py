@@ -4,6 +4,7 @@ import os
 import matplotlib.pyplot as plt
 import torch
 import numpy as np
+import pickle
 
 class SingletonClass(type):
     _instances = {}
@@ -106,6 +107,10 @@ class ProgramRun(metaclass=SingletonClass):
     def save_end_graph(self, data, name='graph.txt'):
         with open(f"{self.name_of_dir}/{name}", "w") as fl:
             fl.write(str(data))
+
+    def save_pickle(self, data, name):
+        with open(f"{self.name_of_dir}/{name}", "wb") as pkl:
+            pickle.dump(data, pkl)
 
     def save_boxplot(self, name, data):
         data = np.array(data)

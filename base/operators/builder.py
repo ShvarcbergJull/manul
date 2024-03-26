@@ -53,7 +53,7 @@ def create_operator_map(grid, individ, model, kwargs):
     operatorsMap.MutationIndivid = MutationIndivid(
         params=dict(mut_intensive=mutation['simple']['intensive'],
                     increase_prob=mutation['simple']['increase_prob'],
-                    source_data=grid.detach().numpy())
+                    source_data=grid.detach().numpy()[individ.basis])
     )
 
     operatorsMap.VarFitnessIndivid = VarFitnessIndivid(
@@ -65,5 +65,5 @@ def create_operator_map(grid, individ, model, kwargs):
     operatorsMap.FitnessPopulation = FitnessPopulation()
 
     operatorsMap.FilterPopulation = FilterPopulation(
-        params=dict(population_size=population_size, source_data=grid.detach().numpy())
+        params=dict(population_size=population_size, source_data=grid.detach().numpy()[individ.basis])
     )

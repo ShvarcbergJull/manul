@@ -3,6 +3,7 @@ from .operators.base import ProgramRun
 
 import ast
 import numpy as np
+import time
 from progress.bar import Bar
 from numba.typed import Dict
 import numba.types as tp
@@ -32,11 +33,7 @@ def draw(graph):
     edges=[]
     for edge in graph.structure:
         pos1 = graph.structure[edge]['orig_pos']
-        # if pos1[0] < -1837.9473415732368:
-        #     continue
         for neig in graph.structure[edge]['neighbours']:
-            # if graph.structure[neig]['orig_pos'][0] < -1837.9473415732368:
-            #     continue
             edges.append(pos1)
             edges.append(graph.structure[neig]['orig_pos'])
             edges.append([None, None, None])
@@ -51,10 +48,6 @@ def draw(graph):
     node_trace = go.Scatter3d(x=nodes[0], y=nodes[1], z=nodes[2], mode='markers',
                                 marker=dict(
                                     showscale=True,
-                                    # colorscale options
-                                    # #'Greys' | 'YlGnBu' | 'Greens' | 'YlOrRd' | 'Bluered' | 'RdBu' |
-                                    # #'Reds' | 'Blues' | 'Picnic' | 'Rainbow' | 'Portland' | 'Jet' |
-                                    # #'Hot' | 'Blackbody' | 'Earth' | 'Electric' | 'Viridis' |
                                     colorscale='YlGnBu',
                                     reversescale=True,
                                     color=colors,
@@ -85,7 +78,7 @@ def draw(graph):
     fig.write_html("data_struct.html")
 
 
-@njit
+# @njit
 def chekkk(source_data, res, start_indexs):
     selects = np.zeros((len(source_data)))
     rem_edges = []
@@ -108,75 +101,18 @@ def chekkk(source_data, res, start_indexs):
             if len(result[result < 0]) > 0:
                 del res[current_index][elem]
                 rem_edges.append((current_index, elem))
-            else:
-                start_indexs.append(elem)
+            # else:
+            #     start_indexs.append(elem)
     
     return res, rem_edges
 
-def probe_function(source_data, res, selects, index):
-    del_list = []
-    next_index = []
-    selects[index] = 1
-    if len(res[index]) == 0:
-        return del_list
-    neigh_indxs = np.array(list(res[index].keys())[::-1])
-    add_params = source_data[neigh_indxs]
-    neighbours = source_data[index] - add_params
-
-    for i, elem in enumerate(neigh_indxs):
-        if selects[elem] == 1:
-            continue
-        check_this = source_data[elem]
-        neigh_2 = check_this - add_params
-        result = np.diag(np.dot(neighbours, neigh_2.T))
-        if len(result[result < 0]) > 0:
-            del res[index][elem]
-            del_list.append((index, elem))
-        else:
-            next_index.append(elem)
-
-    return [del_list, next_index]
-
-def probe_onine_2(index):
-    global selects, temp_edges, source_data
-    del_list = []
-    next_index = []
-    selects[index] = True
-    if len(temp_edges[index]) == 0:
-        return del_list
-    neigh_indxs = np.array(list(temp_edges[index].keys())[::-1])
-    add_params = source_data[neigh_indxs]
-    neighbours = source_data[index] - add_params
-
-    print("bv", neigh_indxs)
-
-    for i, elem in enumerate(neigh_indxs):
-        print("im here")
-        if selects[elem] == 1:
-            continue
-        print("hell")
-        check_this = source_data[elem]
-        print("156")
-        neigh_2 = check_this - add_params
-        print("158")
-        result = np.diag(np.dot(neighbours, neigh_2.T))
-        print("160")
-        if len(result[result < 0]) > 0:
-            print("162")
-            del temp_edges[index][elem]
-            del_list.append((index, elem))
-        print("165")
-        # else:
-        #     next_index.append(elem)
-
-    return del_list
 
 def forming_dict(graph, eds):
     # res = {}
     res = []
     for i in graph:
-        # res.append(Dict.empty(key_type=int64, value_type=float64))
-        res.append({})
+        res.append(Dict.empty(key_type=int64, value_type=float64))
+        # res.append({})
     for i in graph:
         sort_eds = np.argsort(eds[i])
         current_neih_indexs = filter(lambda ind: ind in graph[i],sort_eds)
@@ -188,6 +124,22 @@ def forming_dict(graph, eds):
     return res
 
 class DataStructureGraph(Individ):
+    """
+    Class for Individ. Keeping data about graph and model with graph.
+
+    Attributes
+    ----------
+    fullnes : int
+        The percentage of completion of the graph.
+    new_individ : bool
+        If the value is True, fitness is counted for this individual in the epoch. 
+    number_of_nodes : int
+        Count of nodes in the graph.
+    nuber_of_edges : int
+        Count of edges in the graph.
+    basis : list
+        List with indexes of nodes for using in train.
+    """
 
     def __init__(self, data=None, labels=None, mode=1, n_neighbors=10, eps=0.5, graph_file: str = None):
         super().__init__()
@@ -200,35 +152,26 @@ class DataStructureGraph(Individ):
         
         self.number_of_nodes = len(data)
         self.number_of_edges = 0
+        self.basis = np.arange(len(data))
         
         if graph_file is not None:
-            # with open(graph_file, "r") as fl:
-            #     graph_data = fl.read()
-            # graph_data = ast.literal_eval(graph_data)
-            # self.load_graph(data, graph_data)
             self.find_ED(eps, data)
             self.name_gr = f"{runner.get_path()}/graph.txt"
             self.save_end_graph("rer")
-        elif mode:
-            self.find_ED(eps, data)
-            # self.draw_2d_projection(data)
-            # temp_edges = forming_dict(self.graph, self.matrix_connect)
-            # start_node_index = self.choosing_start_node()
-            # res, delete_edges = chekkk(data, temp_edges, [start_node_index])
-            # res = self.check_visible(data)
-            res = self.check_visible_v2(data)
-            runner.save_graph(res)
-            self.name_gr = f"{runner.get_path()}/graph.txt"
-            # self.local_remove(delete_edges)
-            self.save_end_graph("or")
-            self.draw_2d_projection(data)
         else:
             self.kernel = tp.tpgraph.Kernel(n_neighbors=n_neighbors, n_jobs=1, metric='cosine', fuzzy=True, verbose=True)
             self.kernel.fit(data)
-            self.create_edges()
-
-
-        # self.draw_2d_projection(data)
+            self.find_ED(eps, data)
+            self.basis = self.searсh_basis(self.graph, source_data=data)
+            del self.kernel
+            self.number_of_nodes = len(self.basis)
+            self.find_ED(eps, data[self.basis])
+            time1 = time.time()
+            res = self.check_visible(data[self.basis])
+            print((time.time() - time1) * 1000)
+            self.save_end_graph("base")
+    
+        self.draw_2d_projection(data[self.basis])
         self.calc_fullness()
 
     
@@ -243,8 +186,34 @@ class DataStructureGraph(Individ):
 
     def __eq__(self, __value: object) -> bool:
         return self.graph == __value.graph
+    
+    def copy(self):
+        new_object = self.__class__()
+        new_object.graph = deepcopy(self.graph)
+        new_object.number_of_edges = self.number_of_edges
+        new_object.number_of_nodes = self.number_of_nodes
+        new_object.fullness = self.fullness
+        new_object.matrix_connect = deepcopy(self.matrix_connect)
+        try:
+            new_object.model = self.model.copy()
+        except:
+            print("Step of init")
+
+        return new_object
 
     def load_graph(self, data, res):
+        """
+        Method for load base graph to Individ
+
+        Args:
+        -----
+        data : numpy.array
+            matrix n * m, where n - number of nodes, m - number of features. 
+            Keeping values of nodes by fields.
+        res : list
+            list size of n, where n - number of nodes.
+            Each element is list with neighbour's indexes.  
+        """
         eds = euclidean_distances(data, data)
         maxval = np.max(eds)
         self.matrix_connect = eds / maxval
@@ -254,9 +223,20 @@ class DataStructureGraph(Individ):
             self.number_of_edges += len(edges)
 
     def calc_fullness(self):
+        """
+        Method for calculation the percentage of completion of the graph.
+        """
         self.fullness = (len(list(filter(lambda elem: elem == 0, self.laplassian.reshape(-1)))) / 2 * 100) // len(self.laplassian.reshape(-1))
 
     def save_end_graph(self, num):
+        """
+        Method save getting graph to file.
+
+        Args:
+        -----
+        num : int
+            Number that helps to distinguish graphs by each experiment.
+        """
         runner = ProgramRun()
         res = []
         for i in range(self.number_of_nodes):
@@ -269,7 +249,7 @@ class DataStructureGraph(Individ):
         runner.save_end_graph(res, name=f'graph_{num}.txt')
 
 
-    def draw_2d_projection(self,data):
+    def draw_2d_projection(self, data):
         import networkx as nx
         net_graph = nx.Graph()
 
@@ -289,71 +269,106 @@ class DataStructureGraph(Individ):
 
         my_object = IsolateGraph(data=data, colors=data, graph=net_graph)
         draw(my_object)
-
-        
-    def copy(self):
-        new_object = self.__class__()
-        new_object.graph = deepcopy(self.graph)
-        new_object.number_of_edges = self.number_of_edges
-        new_object.number_of_nodes = self.number_of_nodes
-        new_object.fullness = self.fullness
-        new_object.matrix_connect = deepcopy(self.matrix_connect)
-        try:
-            new_object.model = self.model.copy()
-        except:
-            print("Step of init")
-
-        return new_object
     
     def find_ED(self, eps, source_data):
+        """
+        Method for searching started edges between nodes.
+
+        Args:
+        -----
+        eps : float
+            Epsilon neighbothood for nodes.
+        source_data : np.array
+            matrix n * m, where n - number of nodes, m - number of features. 
+            Keeping values of nodes by fields.
+        """
+        self.number_of_edges = 0
+        self.graph = {} 
         eds = euclidean_distances(source_data, source_data)
         maxval = np.max(eds)
         self.matrix_connect = eds / maxval
+        self.different = np.zeros((eds.shape[0], eds.shape[0], source_data.shape[1]))
+        self.adjactive = np.zeros(eds.shape)
         k = 0
 
-        for i in range(len(eds)):
-            self.graph[i] = []
-            for j in range(i, len(eds)):
-                if i == j:
-                    continue
-                if eds[i][j] / maxval <= eps:
-                    # self.graph.add_edge(i, j, weight=eds[i][j])
-                    try:
-                        if i in self.graph[j]:
-                            print("th")
-                            continue
-                    except:
-                        k = 1
-                    self.graph[i].append(j)
-                    self.number_of_edges += 1
+        if hasattr(self, 'kernel'):
+            lapl = self.kernel.L.todense()
+
+            for i in range(len(eds)):
+                self.graph[i] = []
+                for j in range(i, len(eds)):
+                    if i == j:
+                        continue
+                    if lapl[i, j] != 0:
+                        self.adjactive[i][j] = 1
+                        self.adjactive[j][i] = 1
+                        self.graph[i].append(j)
+                        self.number_of_edges += 1
+        else:
+            for i in range(len(eds)):
+                self.graph[i] = []
+                self.different[i] = -1 * self.different[:, i]
+                for j in range(i, len(eds)):
+                    self.different[i][j] = source_data[i] - source_data[j]
+                    if i == j:
+                        continue
+                    if eds[i][j] / maxval <= eps:
+                        # self.graph.add_edge(i, j, weight=eds[i][j])
+                        try:
+                            if i in self.graph[j]:
+                                print("th")
+                                continue
+                        except:
+                            k = 1
+                        self.adjactive[i][j] = 1
+                        self.adjactive[j][i] = 1
+                        self.graph[i].append(j)
+                        self.number_of_edges += 1
+
+            self.different = np.array(self.different)
 
 
     def add_edge(self, from_node, to_node):
+        """
+        Method for adding new edges.
+
+        Args:
+        -----
+        from_node : int
+            start node of the edge
+        to_node : int
+            end node of the edge
+        """
         self.graph[from_node].append(to_node)
         self.number_of_edges += 1
 
     def remove_edge(self, from_node, to_node):
+        """
+        Method for removing edges.
+
+        Args:
+        -----
+        from_node : int
+            start node of the edge
+        end_node : int
+            end node of the edge
+        """
         try:
             self.graph[from_node].remove(to_node)
         except:
             self.graph[to_node].remove(from_node)
         self.number_of_edges -= 1
 
-    def create_edges(self):
-        eds = euclidean_distances(self._source_data, self._source_data)
-        maxval = np.max(eds)
-        self.matrix_connect = eds / maxval
-        lapl = self.kernel.L.todense()
-
-        for i in range(len(eds)):
-            self.graph[i] = []
-            for j in range(i, len(eds)):
-                if lapl[i][j] != 0:
-                    # self.graph.add_edge(i, j, weight=eds[i][j])
-                    self.graph[i].append(j)
-                    self.number_of_edges += 1
-
     def choosing_start_node(self):
+        """
+        Method for searching node with maximum number of neighbours. 
+        The found node will be used as the starting point when filtering neighbors.
+
+        Returns:
+        -------
+        choose_node : int
+            index of the found node
+        """
         choose_index = None
         for i, node in self.graph.items():
             try:
@@ -366,19 +381,43 @@ class DataStructureGraph(Individ):
     
 
     def local_remove(self, edges_list):
-        # self.graph.remove_edges_from(edges_list)
+        """
+        Method for removing multiple edges from the list.
+
+        Args:
+        -----
+        edges_list : list
+            tuples with start and end nodes of edges.
+        """
         for edge in edges_list:
+            if edge[0] not in self.graph[edge[1]] and edge[1] not in self.graph[edge[0]]:
+                continue
             try:
                 self.graph[edge[0]].remove(edge[1])
             except:
                 self.graph[edge[1]].remove(edge[0])
             self.number_of_edges -= 1
             
+            
+            if edge[0] in self.graph[edge[1]] or edge[1] in self.graph[edge[0]]:
+                print("ux")
+
+
             if edge[0] in self.graph[edge[1]] or edge[1] in self.graph[edge[0]]:
                 print("ux")
 
     
-    def replace_subgraph(self, node: int, new_edges: dict):
+    def replace_subgraph(self, node: int, new_edges: list):
+        """
+        Method for replace some part of graph.
+
+        Args:
+        -----
+        node : int
+            index of the node whose connections with neighbours will be changed
+        new_edges : list
+            index of new neighbours for the node 
+        """
         self.number_of_edges -= len(self.graph[node])
         self.graph[node] = []
         for elem in new_edges:
@@ -386,6 +425,19 @@ class DataStructureGraph(Individ):
 
     
     def check_vn_part(self, source_data, node1, node2):
+        """
+        Method for check visible neighbours in new edge in graph (added using crossover/mutation)
+
+        Args:
+        -----
+        source_data : numpy.array
+            matrix n * m, where n - number of nodes, m - number of features. 
+            Keeping values of nodes by fields.
+        node1 : int
+            one of nodes in the new edge
+        node2 : int
+            one of nodes in the new edge
+        """
         general_neighbours = []
         del_list = []
         gr1 = self.graph[node1]
@@ -410,109 +462,115 @@ class DataStructureGraph(Individ):
             del_list.append((node2, general_neighbours[i]))
         
         self.local_remove(del_list)
+        
+    def check_visible(self, data):
+        """
+        Method for filter the graph from unvisible neighbours.
 
-    # @staticmethod
-    # @njit
-    # def probe_function(source_data, res, selects, index):
-    #     del_list = []
-    #     next_index = []
-    #     if len(res[index]) == 0:
-    #         return del_list
-    #     neigh_indxs = np.array(list(res[index].keys())[::-1])
-    #     add_params = source_data[neigh_indxs]
-    #     neighbours = source_data[index] - add_params
+        Args:
+        -----
+        data : numpy.array
+            matrix n * m, where n - number of nodes, m - number of features. 
+            Keeping values of nodes by fields.
+        """
+        # temp_edges = forming_dict(self.graph, self.matrix_connect)
+        start_node_index = self.choosing_start_node()
+        # res, delete_edges = DataStructureGraph.chicks(data, self.adjactive, self.matrix_connect, self.different, [start_node_index])
+        # res, delete_edges = chekkk(data, temp_edges, [start_node_index])
+        res, delete_edges = DataStructureGraph.chicks(data, self.adjactive, self.matrix_connect, [start_node_index])
+        self.local_remove(delete_edges)
 
-    #     for i, elem in enumerate(neigh_indxs):
-    #         if selects[elem] == 1:
-    #             continue
-    #         check_this = source_data[elem]
-    #         neigh_2 = check_this - add_params
-    #         result = np.diag(np.dot(neighbours, neigh_2.T))
-    #         if len(result[result < 0]) > 0:
-    #             del_list.append((index, elem))
-    #         # else:
-    #         #     next_index.append(elem)
-
-    #     return del_list
-
+        return res
+    
     @staticmethod
     @njit
-    def check_visible_neigh(source_data, res, start_indexs):
+    def chicks(source_data, adjactive, eds, start_nodes):
         selects = np.zeros((len(source_data)))
         rem_edges = []
-        while len(start_indexs) > 0:
-            current_index = start_indexs.pop(0)
-            selects[current_index] = 1
-            if len(res[current_index]) == 0:
+        while len(start_nodes) > 0:
+            current_node = start_nodes.pop(0)
+            selects[current_node] = 1
+            if sum(adjactive[current_node]) == 0:
                 continue
-            neigh_indxs = np.array(list(res[current_index].keys())[::-1])
-            # neigh_indxs = np.array([res[current_index][i] for i in kss])
-            add_params = source_data[neigh_indxs]
-            neighbours = source_data[current_index] - add_params
+            neigh_indexs = np.where(adjactive[current_node] == 1)[0]
+            args = np.argsort(eds[current_node, neigh_indexs])
+            neigh_indexs = neigh_indexs[args[::-1]]
 
-            for i, elem in enumerate(neigh_indxs):
+            add_params = source_data[neigh_indexs]
+            neighbours = source_data[current_node] - add_params
+
+            for i, elem in enumerate(neigh_indexs):
                 if selects[elem] == 1:
                     continue
                 check_this = source_data[elem]
                 neigh_2 = check_this - add_params
                 result = np.diag(np.dot(neighbours, neigh_2.T))
                 if len(result[result < 0]) > 0:
-                    del res[current_index][elem]
-                    rem_edges.append((current_index, elem))
+                    adjactive[current_node][elem] = 0
+                    adjactive[elem][current_node] = 0
+                    rem_edges.append((current_node, elem))
                 else:
-                    start_indexs.append(elem)
-        
-        return res, rem_edges
+                    start_nodes.append(elem)
+
+        return adjactive, rem_edges
     
-    def check_visible_v2(self, data):
-        from multiprocessing import Pool
-        from functools import partial
-        from itertools import chain
-        # global temp_edges, selects, source_data
-        temp_edges = forming_dict(self.graph, self.matrix_connect)
-        start_node_index = [self.choosing_start_node()]
-        selects = np.zeros((len(data)))
-        probe_online = partial(probe_function, data, temp_edges, selects)
-        i = 0
+    @staticmethod
+    def searсh_basis(graph, source_data):
+        """
+        Method for reducing nodes
 
-        while len(start_node_index) > 0:
-            if i == 0: 
-                del_lists = probe_online(start_node_index[0])
-                self.local_remove(del_lists[0])
-                i = 1
-            else:
-                with Pool(2) as p:
-                    del_lists = list(p.map(probe_online, start_node_index))
-                selects[start_node_index] = 1
-                start_node_index =[]
-                for elem in del_lists:
-                    self.local_remove(elem[0])
-                    for pr in elem[0]:
-                        del temp_edges[pr[0]][pr[1]]
-                    add_elems = [el for el in elem[1] if el not in start_node_index]
-                    start_node_index.extend(add_elems)
-                # map(lambda lst: self.local_remove(lst), del_lists)
-            # temp = []
-            # for index in start_node_index:
-            #     temp.extend([elem for elem in temp_edges[index] if selects[elem] == 0])
-            #     selects[index] = 1
-            # start_node_index = temp
-            print(len(selects[selects==True]))
+        Args:
+        -----
+        source_data : numpy.array
+            matrix n * m, where n - number of nodes, m - number of features. 
+            Keeping values of nodes by fields.
 
-        return temp_edges
-    
-    def check_visible(self, data):
-        temp_edges = forming_dict(self.graph, self.matrix_connect)
-        start_node_index = self.choosing_start_node()
-        res, delete_edges = chekkk(data, temp_edges, [start_node_index])
-        self.local_remove(delete_edges)
+        Returns:
+        --------
+        basis : list
+            indexes of the nodes that we save in the graph
+        """
+        def forming_connect(graph):
+            res = []
+            for i in graph:
+                res.append({'index': i, 'neighbours': [], 'stamp': False})
+            for i in graph:
+                for k in graph[i]:
+                    res[k]['neighbours'].append(i)
+                    res[i]['neighbours'].append(k)
 
-        return res
+            return res
+        basis = []
+        graph = forming_connect(graph)
+        temp_graph = list(filter(lambda elem: not elem['stamp'], graph))
+        while len(temp_graph) > 0:
+            max_index = np.argmax([len(elem['neighbours']) for elem in temp_graph])
+            use_index = temp_graph[max_index]['neighbours']
+            use_index.append(temp_graph[max_index]['index'])
+            average_values = np.average(source_data[use_index], axis=0)
+            choose_point = use_index[0]
+            for indx in use_index:
+                if np.sqrt(((source_data[indx] - average_values) ** 2).sum()) < np.sqrt(((source_data[choose_point] - average_values) ** 2).sum()):
+                    choose_point = indx
+                graph[indx]['stamp'] = True
+            basis.append(choose_point)
+            # temp_graph = list(filter(lambda elem: not elem['stamp'], graph))
+            temp_graph = list(filter(lambda elem: elem['index'] not in use_index, temp_graph))
+
+        return basis
+
 
 
 class PopulationGraph(Population):
     """
     Class with population of Graphs.
+
+    Attributes
+    ----------
+    iterations : int
+        number of epochs in population
+    change_fitness : list
+        the fitness values of th elit individ of each epoch 
     """
     def __init__(self, structure: list = None,
                  iterations: int = 0):
@@ -521,22 +579,14 @@ class PopulationGraph(Population):
         self.iterations = iterations
         self.type_ = "PopulationOfGraphs"
         self.change_fitness = []
-        self.laplassian = None
 
     def _evolutionary_step(self, *args):
-        # print(len(self.structure))
         self.apply_operator('FitnessPopulation')
-        # print("Fitness")
         self.apply_operator('Elitism')
-        # print("Elitism")
         self.apply_operator("RouletteWheelSelection")
-        # print("Roulet")
         self.apply_operator("CrossoverPopulation")
-        # print("Crossover")
         self.apply_operator("MutationPopulation")
-        # print("Mutation")
         self.apply_operator("FilterPopulation")
-        # print("Filter")
 
     def evolutionary(self, num, *args):
         print("INFO: create population")
@@ -545,13 +595,10 @@ class PopulationGraph(Population):
         bar.start()
         # поиск возможных вариантов где таргет закрепленный токен
         for n in range(self.iterations):
-            # print('{}/{}\n'.format(n, self.iterations))
             self._evolutionary_step()
             bar.next()
         for individ in self.structure:
             if individ.elitism == True:
-                # self.base_model = individ.model.copy()
-                # self.laplassian = individ.laplassian
                 individ.save_end_graph(num)
                 break
         bar.finish()
@@ -564,7 +611,9 @@ def _methods_decorator(method):
     return wrapper
 
 class TakeNN:
-
+    """
+    Class with neural network 
+    """
     def __init__(self, train_feature, train_target, dims, num_epochs, batch_size, model_settings=None):
         def baseline(dim):
             baseline_model = nn.Sequential(
@@ -577,7 +626,7 @@ class TakeNN:
                 nn.Linear(256, 64, dtype=fl64),
                 nn.ReLU(),
                 nn.Linear(64, 1, dtype=fl64),
-                # nn.Sigmoid()
+                nn.Sigmoid()
                 # nn.LogSoftmax(dim=1)
             )
 
@@ -641,13 +690,13 @@ class TakeNN:
                     except:
                         loss += lmd * tensor(add_loss)
                     # loss += lmd * torch.tensor(add_loss)
-                # fpr, tpr, thresholds = roc_curve(target_y.reshape(-1), output.detach().numpy().reshape(-1))
-                # gmeans = np.sqrt(tpr * (1-fpr))
-                # ix = np.argmax(gmeans)
-                # if not self.threshold:
-                #     self.threshold = thresholds[ix]
-                # else:
-                #     self.threshold = np.mean([thresholds[ix], self.threshold])
+                fpr, tpr, thresholds = roc_curve(target_y.reshape(-1), output.detach().numpy().reshape(-1))
+                gmeans = np.sqrt(tpr * (1-fpr))
+                ix = np.argmax(gmeans)
+                if not self.threshold:
+                    self.threshold = thresholds[ix]
+                else:
+                    self.threshold = np.mean([thresholds[ix], self.threshold])
                 loss.backward()
                 self.model_settings["optimizer"].step()
                 # print(loss.item())
@@ -681,6 +730,7 @@ class TakeNN:
         nw_output = output.detach().numpy()
         nw_output = nw_output.round().astype("int64")
         # return_loss = roc_auc_score(target_y.reshape_as(output), output.detach().numpy())
+        # return return_loss
         return_loss = mean_squared_error(target_y.reshape_as(output), nw_output)
 
         return 1/return_loss
