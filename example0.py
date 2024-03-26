@@ -54,43 +54,41 @@ def find_graph_loss(graph_laplassian, f_x, indexs=None):
 
     return loss.reshape(-1)[0]
 
-@njit
-def find_loss_ind(laplassian, f_x, indexs=None):
-    if indexs is not None:
-        laplassian = laplassian[indexs][:indexs]
-    
-    part_1 = np.dot(f_x.T, laplassian)
-    loss = np.dot(part_1, f_x)
-
-    return loss.reshape(-1)
-
 
 def run_experiment(base_model, test_feature, test_target, number):
     runner = ProgramRun()
 
-    base_model.train()
-    result1 = base_model.model_settings['model'](test_feature)
+    base_model.train() # обучение базовой модели
+    result1 = base_model.model_settings['model'](test_feature) # получение результатов из модели на тестовой выборке
     result1 = result1.detach().numpy()
-    result1 = np.where(result1 > base_model.threshold, 1, 0)
-    runner.save_pickle(result1, f"result1_{number}.pkl")
+    if base_model.problem == 'class':
+        result1 = np.where(result1 > base_model.threshold, 1, 0)
+        runner.save_pickle(result1, f"result1_{number}.pkl") # сохранение результата
+        metric_nn_1 = f1_score(test_target.reshape(-1), result1.reshape(-1), average=None) # считается метрика
+    else:
+        runner.save_pickle(result1, f"raw_result1_{number}.pkl")
+        result1 = result1.round().astype("int64")
+        runner.save_pickle(result1, f"result1_{number}.pkl")
+        metric_nn_1 = mean_squared_error(test_target.reshape(-1), result1.reshape(-1))
 
-    metric_nn_1 = f1_score(test_target.reshape(-1), result1.reshape(-1), average=None)
 
-    population = PopulationGraph(iterations=50)
-    population.evolutionary(num=number)
+    population = PopulationGraph(iterations=50) # создание популяции
+    population.evolutionary(num=number) # запуск ЭА
 
-    # population.base_model.train(find_graph_loss, population.laplassian)
-
-    result2 = population.base_model.model_settings['model'](test_feature)
+    result2 = population.base_model.model_settings['model'](test_feature) # получение результатов на модели из ЭА на тестовой выборке
     result2 = result2.detach().numpy()
-    result2 = np.where(result2 > population.base_model.threshold, 1, 0)
-    runner.save_pickle(result2, f"result2_{number}.pkl")
+    if base_model.problem == 'class':
+        result2 = np.where(result2 > population.base_model.threshold, 1, 0)
+        runner.save_pickle(result2, f"result2_{number}.pkl")
+        metric_nn_2 = f1_score(test_target.reshape(-1), result2.reshape(-1), average=None)
+        runner.save_confusion_matrix(f"conf_just_model_{number}", data=[test_target, result1])
+        runner.save_confusion_matrix(f"conf_EA_model_{number}", data=[test_target, result2])
+    else:
+        runner.save_pickle(result2, f"raw_result2_{number}.pkl")
+        result2 = result2.round().astype("int64")
+        runner.save_pickle(result2, f"result2_{number}.pkl")
+        metric_nn_2 = mean_squared_error(test_target.reshape(-1), result2.reshape(-1))
 
-    metric_nn_2 = f1_score(test_target.reshape(-1), result2.reshape(-1), average=None)
-
-    runner.save_confusion_matrix(f"conf_just_model_{number}", data=[test_target, result1])
-    runner.save_confusion_matrix(f"conf_EA_model_{number}", data=[test_target, result2])
-    # runner.save_confusion_matrix(f"conf_matrix_{number}", data=[test_target, result1], data2=[test_target, result2])
     runner.save_plot(f"fitness_{number}", population.change_fitness)
     runner.save_model(f"model_{number}", population.base_model.model_settings['model'])
 
@@ -100,107 +98,20 @@ def run_experiment(base_model, test_feature, test_target, number):
 
     return return_dictionary
 
-def run_experiment_regression(base_model, test_feature, test_target, number):
-    runner = ProgramRun()
 
-    base_model.train()
-    result1 = base_model.model_settings['model'](test_feature)
-    result1 = result1.detach().numpy()
-    # runner.save_end_graph(data=result1, name=f"raw_result1_{number}.txt")
-    runner.save_pickle(result1, f"raw_result1_{number}.pkl")
-    result1 = result1.round().astype("int64")
-    # runner.save_end_graph(data=result1, name=f"result1_{number}.txt")
-    runner.save_pickle(result1, f"result1_{number}.pkl")
-
-    metric_nn_1 = mean_squared_error(test_target.reshape(-1), result1.reshape(-1))
-
-    population = PopulationGraph(iterations=400)
-    population.evolutionary(num=number)
-
-    # population.base_model.train(find_graph_loss, population.laplassian)
-
-    result2 = population.base_model.model_settings['model'](test_feature)
-    result2 = result2.detach().numpy()
-    # runner.save_end_graph(data=result2, name=f"raw_result2_{number}.txt")
-    runner.save_pickle(result2, f"raw_result2_{number}.pkl")
-    result2 = result2.round().astype("int64")
-    # runner.save_end_graph(data=result2, name=f"result2_{number}.txt")
-    runner.save_pickle(result2, f"result2_{number}.pkl")
-
-    metric_nn_2 = mean_squared_error(test_target.reshape(-1), result2.reshape(-1))
-
-    # runner.save_plots(name=f"result_{number}", data=[test_target.reshape(-1), result1.reshape(-1), result2.reshape(-1)], labels=["target", "base", "man"])
-    # runner.save_plots(name=f"dif_result_{number}", data=[abs(test_target.reshape(-1) - result1.reshape(-1)), abs(test_target.reshape(-1) - result2.reshape(-1))], labels=["dif_base", "dif_man"])
-    runner.save_plot(f"fitness_{number}", population.change_fitness)
-    runner.save_model(f"model_{number}", population.base_model.model_settings['model'])
-
-    return_dictionary = {
-        "f1_score": [metric_nn_1, metric_nn_2],
-    }
-
-    return return_dictionary
-
-def forming_connect(graph):
-    # res = {}
-    res = []
-    for i in graph:
-        res.append({'index': i, 'neighbours': [], 'stamp': False})
-        # res[i] = {}
-    for i in graph:
-        for k in graph[i]:
-            # res[i][eds[i][k]] = k
-            res[k]['neighbours'].append(i)
-            res[i]['neighbours'].append(k)
-
-    return res
-
-def searсh_basis(graph, source_data):
-    basis = []
-    graph = forming_connect(graph)
-    temp_graph = list(filter(lambda elem: not elem['stamp'], graph))
-    while len(temp_graph) > 0:
-        max_index = np.argmax([len(elem['neighbours']) for elem in temp_graph])
-        use_index = temp_graph[max_index]['neighbours']
-        use_index.append(temp_graph[max_index]['index'])
-        average_values = np.average(source_data[use_index], axis=0)
-        choose_point = use_index[0]
-        for indx in use_index:
-            if ((source_data[indx] - average_values) ** 2).sum().sqrt() < ((source_data[choose_point] - average_values) ** 2).sum().sqrt():
-                choose_point = indx
-            graph[indx]['stamp'] = True
-        basis.append(choose_point)
-        temp_graph = list(filter(lambda elem: not elem['stamp'], graph))
-
-    return basis
-
-
-def main(data: Union[str, np.ndarray]):
-    # feature, target = exp_sonar()
-    # feature, target = exp_real_data2()
-    # feature, target = exp_real_data3()
-    # feature, target = expe_water()
-    # feature, target = exp_airlines()
-    # feature, target = wine_example()
-    feature, target = mammonth_example()
-    # feature, target = airfoil_exmpl()
-    # feature = data[:, :-1]
-    # target = data[:, -1]
-    train_feature, train_target, test_feature, test_target, dims = handler_of_data(feature, target)
-    print(train_feature.shape)
+def main(feature, target):
+    
+    train_feature, train_target, test_feature, test_target, dims = handler_of_data(feature, target) # разделение данных на обуяающую и тестовую выборки
 
     logging.info("Creating base individ...")
-    # base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), graph_file="Info_log\\2024_02_27-12_13_10_PM\\graph_or.txt", n_neighbors=20, eps=0.15)
-    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), n_neighbors=10, eps=0.15, mode=0)
-    # basis = searсh_basis(base_individ.graph, train_feature)
-    # print("Searching base", len(train_feature), len(basis))
+    base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), n_neighbors=10, eps=0.15, mode=0) # создание базового индивида
     with open("test_bas.txt", 'w') as fl:
-        fl.write(str(base_individ.basis))
-    # other_indiv = DataStructureGraph(train_feature.numpy()[basis], train_target.numpy()[basis], n_neighbors=7, eps=0.15, mode=0)
-    # pass
-    base_model = TakeNN(train_feature[base_individ.basis], train_target[base_individ.basis], dims=dims, num_epochs=30, batch_size=300)
+        fl.write(str(base_individ.basis)) # сохранение индексов точек от всех данных, нужно для рисование результата
+    base_model = TakeNN(train_feature[base_individ.basis], train_target[base_individ.basis], dims=dims, num_epochs=30, batch_size=300) # создание модели
     logging.info("Creating map with operators and population")
 
-    build_settings = {
+    # словарик настроек для жволюционных операторов
+    build_settings = { 
         'mutation': {
             'simple': dict(intensive=30, increase_prob=1),
         },
@@ -213,32 +124,38 @@ def main(data: Union[str, np.ndarray]):
         'fitness': {
             'test_feature': test_feature,
             'test_target': test_target,
-            'add_loss_function': find_graph_loss
+            'add_loss_function': find_graph_loss # функция, которая используется в процессе обучения модели с графом
         }
     }
 
-    create_operator_map(train_feature, base_individ, base_model.copy(), build_settings)
-    runner = ProgramRun()
+    create_operator_map(train_feature, base_individ, base_model.copy(), build_settings) # создание OperatorMap
+    runner = ProgramRun() # просто для инициализации
 
     boxplot_data = []
 
-    for i in range(1):
-        new_model = TakeNN(train_feature, train_target, dims=dims, num_epochs=30, batch_size=300)
-        result = run_experiment_regression(new_model, test_feature, test_target, i)
-        # result = run_experiment(new_model, test_feature, test_target, i)
-        boxplot_data.append(result['f1_score'])
+    for i in range(1): # запуск цикла по кол-ву запусков эксперимента
+        new_model = TakeNN(train_feature, train_target, dims=dims, num_epochs=30, batch_size=300) # создаybt базовой модели (на которой не будет применяться обучения с учётом графа) 
+        result = run_experiment(new_model, test_feature, test_target, i) # запуск эксперимента
+        # boxplot_data.append(result['f1_score'])
 
-    # runner.save_boxplot("boxplot", boxplot_data)
     runner.save_end_graph(test_target, name="target.txt")
 
 
 if __name__ == "__main__":
-    data = create_swiss_roll(12000)
-    # data = create_circle(1, 10000)
-    # data = "data/electricity-normalized.arff"
-    # data = "data/phpSSK7iA.arff"
-    # data = "data/sonar_dataset.csv"
-    # data = "data/water_potability.csv"
-    main(data)
+    # вызываются данные
+
+    # data = create_swiss_roll(12000)
+    # feature = data[:, :-1]
+    # target = data[:, -1]
+
+    # feature, target = exp_sonar()
+    # feature, target = exp_real_data2()
+    # feature, target = exp_real_data3()
+    # feature, target = expe_water()
+    # feature, target = exp_airlines()
+    # feature, target = wine_example()
+    feature, target = mammonth_example()
+    # feature, target = airfoil_exmpl()
+    main(feature, target)
 
 

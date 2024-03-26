@@ -78,51 +78,6 @@ def draw(graph):
     fig.write_html("data_struct.html")
 
 
-# @njit
-def chekkk(source_data, res, start_indexs):
-    selects = np.zeros((len(source_data)))
-    rem_edges = []
-    while len(start_indexs) > 0:
-        current_index = start_indexs.pop(0)
-        selects[current_index] = 1
-        if len(res[current_index]) == 0:
-            continue
-        neigh_indxs = np.array(list(res[current_index].keys())[::-1])
-        # neigh_indxs = np.array([res[current_index][i] for i in kss])
-        add_params = source_data[neigh_indxs]
-        neighbours = source_data[current_index] - add_params
-
-        for i, elem in enumerate(neigh_indxs):
-            if selects[elem] == 1:
-                continue
-            check_this = source_data[elem]
-            neigh_2 = check_this - add_params
-            result = np.diag(np.dot(neighbours, neigh_2.T))
-            if len(result[result < 0]) > 0:
-                del res[current_index][elem]
-                rem_edges.append((current_index, elem))
-            # else:
-            #     start_indexs.append(elem)
-    
-    return res, rem_edges
-
-
-def forming_dict(graph, eds):
-    # res = {}
-    res = []
-    for i in graph:
-        res.append(Dict.empty(key_type=int64, value_type=float64))
-        # res.append({})
-    for i in graph:
-        sort_eds = np.argsort(eds[i])
-        current_neih_indexs = filter(lambda ind: ind in graph[i],sort_eds)
-        for k in current_neih_indexs:
-            # res[i][eds[i][k]] = k
-            res[k][i] = eds[i][k]
-            res[i][k] = eds[i][k]
-
-    return res
-
 class DataStructureGraph(Individ):
     """
     Class for Individ. Keeping data about graph and model with graph.
@@ -142,6 +97,20 @@ class DataStructureGraph(Individ):
     """
 
     def __init__(self, data=None, labels=None, mode=1, n_neighbors=10, eps=0.5, graph_file: str = None):
+        """
+        Args
+        ----
+        data : numpy.array
+            values of features for each data
+        labels : numpy.array
+            target's values for each data
+        n_neighbors : int
+            count near neighbours, using for reduction nodes in graph
+        eps : float
+            epsilon neighborhood for each node, using for searching ending edges
+        graph_file : str
+            name of file with ready graph
+        """
         super().__init__()
         self.fullness = 0 # 0-100
         self.new_individ = True
@@ -614,32 +583,47 @@ class TakeNN:
     """
     Class with neural network 
     """
-    def __init__(self, train_feature, train_target, dims, num_epochs, batch_size, model_settings=None):
+    def __init__(self, train_feature, train_target, dims, num_epochs, batch_size, problem='class', model_settings=None):
         def baseline(dim):
-            baseline_model = nn.Sequential(
-                nn.Linear(dim, 512, dtype=fl64),
-                nn.ReLU(),
-                nn.Linear(512, 256, dtype=fl64),
-                nn.ReLU(),
-                nn.Linear(256, 256, dtype=fl64),
-                nn.ReLU(),
-                nn.Linear(256, 64, dtype=fl64),
-                nn.ReLU(),
-                nn.Linear(64, 1, dtype=fl64),
-                nn.Sigmoid()
-                # nn.LogSoftmax(dim=1)
-            )
+            if problem == 'class':
+                baseline_model = nn.Sequential(
+                    nn.Linear(dim, 512, dtype=fl64),
+                    nn.ReLU(),
+                    nn.Linear(512, 256, dtype=fl64),
+                    nn.ReLU(),
+                    nn.Linear(256, 256, dtype=fl64),
+                    nn.ReLU(),
+                    nn.Linear(256, 64, dtype=fl64),
+                    nn.ReLU(),
+                    nn.Linear(64, 1, dtype=fl64),
+                    nn.Sigmoid()
+                )
+            elif problem == 'regres':
+                baseline_model = nn.Sequential(
+                    nn.Linear(dim, 512, dtype=fl64),
+                    nn.ReLU(),
+                    nn.Linear(512, 256, dtype=fl64),
+                    nn.ReLU(),
+                    nn.Linear(256, 256, dtype=fl64),
+                    nn.ReLU(),
+                    nn.Linear(256, 64, dtype=fl64),
+                    nn.ReLU(),
+                    nn.Linear(64, 1, dtype=fl64)
+                )
 
             return baseline_model
         
         self.model_settings = {}
+        self.problem = problem
 
         if model_settings:
             self.model_settings = model_settings
         else:
             self.model_settings["model"] = baseline(dims)
-            # self.model_settings["criterion"] = nn.BCELoss()
-            self.model_settings["criterion"] = nn.L1Loss()
+            if problem == 'class':
+                self.model_settings["criterion"] = nn.BCELoss()
+            else:
+                self.model_settings["criterion"] = nn.L1Loss()
             self.model_settings['optimizer'] = Adam(self.model_settings['model'].parameters(), lr=1e-4, eps=1e-4)
         
         self.features = train_feature
@@ -652,11 +636,6 @@ class TakeNN:
     def copy(self):
         new_object = self.__class__(self.features, self.target, 1, self.num_epochs, self.batch_size, model_settings=self.model_settings)
         new_object.threshold = deepcopy(self.threshold)
-        # new_object.model_settings = deepcopy(self.model_settings)
-        # new_object.features = deepcopy(self.features)
-        # new_object.target = deepcopy(self.target)
-        # new_object.num_epochs = deepcopy(self.num_epochs)
-        # new_object.batch_size = deepcopy(self.batch_size)
 
         return new_object 
 
@@ -668,15 +647,11 @@ class TakeNN:
         end = False
         last_loss = None
         count_loss = 0
-        # adding_loss = None
-        # if add_loss_func:
-        #     adding_loss = test_function(graph, train_features)
         while epoch < self.num_epochs and end == False:
             permutation = randperm(self.features.size()[0])
             loss_list = []
             for i in range(0, len(self.target), self.batch_size):
                 indices = permutation[i:i+self.batch_size]
-                # print(indices)
                 batch_x, target_y = self.features[indices], self.target[indices]
                 target_y = target_y.to(fl64)
                 self.model_settings["optimizer"].zero_grad()
@@ -684,24 +659,21 @@ class TakeNN:
                 loss = self.model_settings["criterion"](output, target_y.reshape_as(output))
                 if add_loss_func:
                     add_loss = add_loss_func(graph, output.detach().numpy(), indices)
-                    # add_loss = adding_loss[indices]
                     try:
                         loss += lmd * tensor(add_loss[0, 0])
                     except:
                         loss += lmd * tensor(add_loss)
-                    # loss += lmd * torch.tensor(add_loss)
-                fpr, tpr, thresholds = roc_curve(target_y.reshape(-1), output.detach().numpy().reshape(-1))
-                gmeans = np.sqrt(tpr * (1-fpr))
-                ix = np.argmax(gmeans)
-                if not self.threshold:
-                    self.threshold = thresholds[ix]
-                else:
-                    self.threshold = np.mean([thresholds[ix], self.threshold])
+                if self.problem == 'class':
+                    fpr, tpr, thresholds = roc_curve(target_y.reshape(-1), output.detach().numpy().reshape(-1))
+                    gmeans = np.sqrt(tpr * (1-fpr))
+                    ix = np.argmax(gmeans)
+                    if not self.threshold:
+                        self.threshold = thresholds[ix]
+                    else:
+                        self.threshold = np.mean([thresholds[ix], self.threshold])
                 loss.backward()
                 self.model_settings["optimizer"].step()
-                # print(loss.item())
                 loss_list.append(loss.item())
-            # print(loss_list)
             loss_mean = np.mean(loss_list)
 
             if graph is not None:
@@ -711,7 +683,6 @@ class TakeNN:
                 else:
                     if np.isclose(loss.detach().numpy(), last_loss.detach().numpy(), atol=1e-3):
                         count_loss += 1
-                        # print("test")
                     last_loss = loss
                 if count_loss >= 10:
                     end = True
@@ -719,7 +690,6 @@ class TakeNN:
                 epoch += 1
 
             t += 1
-            # print('Surface training t={}, loss={}'.format(t, loss_mean), count_loss)
 
         self.model_settings["model"].eval()
 
@@ -729,29 +699,11 @@ class TakeNN:
         target_y = self.target.to(fl64)
         nw_output = output.detach().numpy()
         nw_output = nw_output.round().astype("int64")
-        # return_loss = roc_auc_score(target_y.reshape_as(output), output.detach().numpy())
-        # return return_loss
+        if self.problem == 'class':
+            return_loss = roc_auc_score(target_y.reshape_as(output), output.detach().numpy())
+            return return_loss
         return_loss = mean_squared_error(target_y.reshape_as(output), nw_output)
-
-        return 1/return_loss
-
-    
-    def get_current_loss(self, features, target, add_loss_func=None, graph=None):
-        # lmd = 1/((len(features)) ** 2)
-        output = self.model_settings["model"](features)
-        output = output.detach().numpy()
-        output = np.where(output > self.threshold, 1, 0)
-        loss = f1_score(target.reshape(-1), output.reshape(-1), average='weighted')
-
-        return loss
-        # loss = self.model_settings["criterion"](output, target.reshape_as(output))
-        # if add_loss_func:
-        #     add_loss = add_loss_func(graph, output.detach().numpy())
-        #     try:
-        #         loss += lmd * tensor(add_loss[0, 0])
-        #     except:
-        #         loss += lmd * tensor(add_loss)
-    
+        return 1/return_loss    
 
 class IsolateGraph:
     def __init__(self, data, colors, graph):
