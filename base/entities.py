@@ -581,7 +581,14 @@ def _methods_decorator(method):
 
 class TakeNN:
     """
-    Class with neural network 
+    Class with neural network
+
+    Attribites
+    ----------
+    problem : str
+        type of problem, 2 tasks are being processed: 'class' and 'regres'
+    model_settings : dict
+        dictionary with all settings for NN (model, criterion, optimizer)
     """
     def __init__(self, train_feature, train_target, dims, num_epochs, batch_size, problem='class', model_settings=None):
         def baseline(dim):
@@ -634,7 +641,7 @@ class TakeNN:
         self.threshold = None
     
     def copy(self):
-        new_object = self.__class__(self.features, self.target, 1, self.num_epochs, self.batch_size, model_settings=self.model_settings)
+        new_object = self.__class__(self.features, self.target, 1, self.num_epochs, self.batch_size, problem=self.problem, model_settings=self.model_settings)
         new_object.threshold = deepcopy(self.threshold)
 
         return new_object 

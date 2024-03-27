@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-import logging
 import ast
 import os
 import sys
@@ -15,7 +14,6 @@ sys.path.append(root_dir)
 
 from base.entities import IsolateGraph
 
-logger = logging.getLogger()
 def handler_of_data(feature, target):
     # dims = len(feature.keys())
     dims = feature.shape[-1]
@@ -39,7 +37,6 @@ def handler_of_data(feature, target):
 
 def wine_example():
     import pandas as pd
-    logger.info("Data with wine")
     df = pd.read_csv("data/winequality-red.csv")
     features = df[df.keys()[:-1]].to_numpy()
     target = df[df.keys()[-1]].to_numpy()

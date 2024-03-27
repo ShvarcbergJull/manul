@@ -8,9 +8,6 @@ sys.path.append(root_dir)
 
 import numpy as np
 from numba import njit
-import pandas as pd
-import logging
-from copy import deepcopy
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, f1_score, mean_squared_error
 import matplotlib.pyplot as plt
 
@@ -72,7 +69,7 @@ def run_experiment(base_model, test_feature, test_target, number):
         metric_nn_1 = mean_squared_error(test_target.reshape(-1), result1.reshape(-1))
 
 
-    population = PopulationGraph(iterations=50) # создание популяции
+    population = PopulationGraph(iterations=3) # создание популяции
     population.evolutionary(num=number) # запуск ЭА
 
     result2 = population.base_model.model_settings['model'](test_feature) # получение результатов на модели из ЭА на тестовой выборке
@@ -103,12 +100,10 @@ def main(feature, target):
     
     train_feature, train_target, test_feature, test_target, dims = handler_of_data(feature, target) # разделение данных на обуяающую и тестовую выборки
 
-    logging.info("Creating base individ...")
     base_individ = DataStructureGraph(train_feature.numpy(), train_target.numpy(), n_neighbors=10, eps=0.15, mode=0) # создание базового индивида
     with open("test_bas.txt", 'w') as fl:
         fl.write(str(base_individ.basis)) # сохранение индексов точек от всех данных, нужно для рисование результата
-    base_model = TakeNN(train_feature[base_individ.basis], train_target[base_individ.basis], dims=dims, num_epochs=30, batch_size=300) # создание модели
-    logging.info("Creating map with operators and population")
+    base_model = TakeNN(train_feature[base_individ.basis], train_target[base_individ.basis], dims=dims, num_epochs=30, batch_size=300, problem='regres') # создание модели
 
     # словарик настроек для жволюционных операторов
     build_settings = { 
@@ -134,7 +129,7 @@ def main(feature, target):
     boxplot_data = []
 
     for i in range(1): # запуск цикла по кол-ву запусков эксперимента
-        new_model = TakeNN(train_feature, train_target, dims=dims, num_epochs=30, batch_size=300) # создаybt базовой модели (на которой не будет применяться обучения с учётом графа) 
+        new_model = TakeNN(train_feature, train_target, dims=dims, num_epochs=30, batch_size=300, problem='regres') # создаybt базовой модели (на которой не будет применяться обучения с учётом графа) 
         result = run_experiment(new_model, test_feature, test_target, i) # запуск эксперимента
         # boxplot_data.append(result['f1_score'])
 
@@ -144,7 +139,7 @@ def main(feature, target):
 if __name__ == "__main__":
     # вызываются данные
 
-    # data = create_swiss_roll(12000)
+    # data = create_swiss_roll(2000)
     # feature = data[:, :-1]
     # target = data[:, -1]
 
